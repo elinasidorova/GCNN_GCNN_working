@@ -1,0 +1,28 @@
+#!/bin/bash
+metals=("Cf" "Bk" "Cm" "Am" "Th" "Lu" "Yb" "Tm" "Er" "Ho" "Dy" "Tb" "Gd" "Eu" "Sm" "Nd" "Pr" "Ce" "La" "Bi" "Pb" "Hg" "Cd" "Ag" "Y" "Zn" "Cu" "Ni" "Co" "Fe" "Mn" "Ca" "Al" "Mg")
+
+check_metal() {
+  metal=$1
+  if [ -f outs/train_general_strong_testonly_${metal}.out ]; then
+    echo "Output file for ${metal} already exists. Skipping."
+    return 1
+  fi
+
+  if [ -f Output/GeneralModelStrong/General_${metal}_*/metrics.json ]; then
+    echo "Metrics file already exists for ${metal}. Skipping."
+    return 1
+  fi
+
+  return 0
+}
+
+for metal in "${metals[@]}"; do
+  if check_metal "${metal}"; then
+    ( nohup python train_general_strong_testonly.py "${metal}" > outs/train_general_strong_testonly_${metal}.out & )
+    echo "Started processing ${metal}"
+    sleep 20
+    while [ $(ps uaxw | grep "python train_general_strong_testonly.py" | grep -v grep | wc -l) -ge 3 ]; do
+      sleep 1
+    done
+  fi
+done

@@ -1,0 +1,107 @@
+import sys
+
+import torch
+from skipatom import SkipAtomInducedModel
+from torch.nn import LeakyReLU
+from torch_geometric.loader import DataLoader
+from torch_geometric.nn import global_mean_pool, MFConv
+
+from Source.data import train_test_valid_split, get_num_node_features, get_batch_size, get_num_targets, \
+    get_num_metal_features
+from Source.metal_ligand_concat import max_unifunc
+from Source.model import MolGraphHeteroNet
+from Source.mol_featurizer import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
+from Source.trainer import MolGraphHeteroNetTrainer
+
+
+def train_testonly(train_sdf, test_sdf, output_path, output_mark, seed, batch_size=10, n_split=10, epochs=1000,
+                   es_patience=100, model_parameters=None):
+    model_parameters = {} if model_parameters is None else model_parameters
+    featurized_train = featurize_sdf_with_metal(path_to_sdf=train_sdf,
+                                                mol_featurizer=ConvMolFeaturizer(),
+                                                metal_featurizer=SkipatomFeaturizer(models=[
+                                                    SkipAtomInducedModel.load(
+                                                        "skipatom_models/AmBkCfCm_2022_11_23.dim200.model",
+                                                        "skipatom_models/AmBkCfCm_2022_11_23.training.data",
+                                                        min_count=2e7, top_n=5
+                                                    ),
+                                                    SkipAtomInducedModel.load(
+                                                        "skipatom_models/mp_2020_10_09.dim200.model",
+                                                        "skipatom_models/mp_2020_10_09.training.data",
+                                                        min_count=2e7, top_n=5
+                                                    ),
+                                                ]))
+
+    folds = train_test_valid_split(featurized_train, n_split, test_ratio=0.1, batch_size=batch_size,
+                                   subsample_size=False, return_test=False)
+
+    featurized_test = featurize_sdf_with_metal(path_to_sdf=test_sdf,
+                                               mol_featurizer=ConvMolFeaturizer(),
+                                               metal_featurizer=SkipatomFeaturizer(models=[
+                                                   SkipAtomInducedModel.load(
+                                                       "skipatom_models/AmBkCfCm_2022_11_23.dim200.model",
+                                                       "skipatom_models/AmBkCfCm_2022_11_23.training.data",
+                                                       min_count=2e7, top_n=5
+                                                   ),
+                                                   SkipAtomInducedModel.load(
+                                                       "skipatom_models/mp_2020_10_09.dim200.model",
+                                                       "skipatom_models/mp_2020_10_09.training.data",
+                                                       min_count=2e7, top_n=5
+                                                   ),
+                                               ]))
+    test_data = DataLoader(featurized_test, batch_size=batch_size)
+
+    model = MolGraphHeteroNet(
+        node_features=get_num_node_features(folds[0]),
+        metal_features=get_num_metal_features(folds[0]),
+        num_targets=get_num_targets(folds[0]),
+        batch_size=get_batch_size(folds[0]),
+        **model_parameters,
+    )
+
+    trainer = MolGraphHeteroNetTrainer(
+        model=model,
+        train_valid_data=folds,
+        test_data=test_data,
+        output_folder=output_path,
+        out_folder_mark=output_mark,
+        epochs=epochs,
+        es_patience=es_patience,
+        seed=seed,
+    )
+
+    trainer.train_cv_models()
+
+
+metal = sys.argv[1]
+seed = 25
+
+model_parameters = {
+    'hidden_metal': [200, 256, 128, 128, 64, 64],
+    'hidden_conv': [75, 128, 128, 64],
+    'hidden_linear': [64, 256],
+    'metal_dropout': 0.2510891227480936,
+    'conv_dropout': 0.2793624333797553,
+    'linear_dropout': 0.0669887915564103,
+    'metal_ligand_unifunc': max_unifunc,
+    'conv_layer': MFConv,
+    'pooling_layer': global_mean_pool,
+    'conv_actf': LeakyReLU(),
+    'linear_actf': LeakyReLU(),
+    'linear_bn': True,
+    'optimizer': torch.optim.Adam,
+    'optimizer_parameters': None,
+}
+
+train_testonly(
+    train_sdf=f"Data/GeneralModel_OldData/{metal}_testonly_train.sdf",
+    test_sdf=f"Data/GeneralModel_OldData/{metal}_testonly_test.sdf",
+    output_path="Output",
+    output_mark=f"GeneralModel/GeneralOld_{metal}_seed{seed}_testonly_10folds",
+    seed=seed,
+    batch_size=32,
+    n_split=2,
+    epochs=1000,
+    es_patience=100,
+    model_parameters=model_parameters,
+)
