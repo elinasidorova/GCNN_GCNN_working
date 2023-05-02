@@ -11,7 +11,7 @@ from torch_geometric.nn import MFConv, global_max_pool
 from Source.data import get_num_node_features, get_num_metal_features, get_num_targets, get_batch_size
 from Source.metal_ligand_concat import max_unifunc
 from Source.models.model_with_attention import MolGraphHeteroNet
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
 from Source.trainer import MolGraphHeteroNetTrainer
 
 

@@ -13,13 +13,13 @@ from Source.trainer import MolGraphHeteroNetTrainer
 from Source.models.model_with_attention import MolGraphHeteroNet
 from Source.data import train_test_valid_split, get_num_node_features, get_num_metal_features, get_num_targets, \
     get_batch_size
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
 from torch_geometric.loader import DataLoader
 
 n_split = 10
 batch_size = 64
-train_sdf = "Data/OneMetal/Cm.sdf"
-test_sdf = "Data/OneMetal/Cm.sdf"
+train_sdf = "Data/OneM/Cm.sdf"
+test_sdf = "Data/OneM/Cm.sdf"
 output_path = "Output"
 
 featurized_train = featurize_sdf_with_metal(path_to_sdf=train_sdf,

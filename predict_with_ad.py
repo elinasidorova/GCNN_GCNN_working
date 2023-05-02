@@ -13,7 +13,7 @@ sys.path.append("./Source")
 from Source.knn_ad import get_sdfs_ad
 from Source.Predictor import Predictor
 from Source.data import train_test_valid_split
-from Source.featurizers.mol_featurizer import featurize_sdf
+from Source.featurizers.featurizers import featurize_sdf
 
 path_to_sdf = "/home/cairne/PythonProj/SmartChemDesign/mol_torch_model/Data/An_converted/Am_ML.sdf"
 path_to_model = "/home/cairne/PythonProj/SmartChemDesign/mol_torch_model/Output/Results_Am_logK_regression_2022_07_19_19_19_07"

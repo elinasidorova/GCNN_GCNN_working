@@ -11,7 +11,7 @@ from torch.optim import AdamW
 from torch_geometric.loader import DataLoader
 
 from Source.models.megnet_model import MEGNet
-from Source.featurizers.mol_featurizer import ConvMolFeaturizer, SkipatomFeaturizer
+from Source.featurizers.featurizers import ConvMolFeaturizer, SkipatomFeaturizer
 from Source.trainer import MegnetTrainer
 
 

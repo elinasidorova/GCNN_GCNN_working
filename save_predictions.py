@@ -6,7 +6,7 @@ from sklearn.metrics import r2_score
 from torch_geometric.data import Batch
 
 from Source.models.GCNN_bimodal import MolGraphHeteroNet
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
 
 transition_metals = ["Mg", "Al", "Ca", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Y", "Ag", "Cd", "Hg", "Pb", "Bi"]
 Ln_metals = ["La", "Ce", "Pr", "Nd", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]

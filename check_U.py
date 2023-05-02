@@ -46,7 +46,7 @@ class SuperModel(nn.Module):
 
 
 train_folder = "Output/GeneralModel/General_Bi_seed25_testonly_10folds_regression_2023_03_12_14_45_44"
-test_sdf = "Data/OneMetal/U.sdf"
+test_sdf = "Data/OneM/U.sdf"
 model = SuperModel(MolGraphHeteroNet, train_folder)
 
 batch = Batch.from_data_list(featurize_sdf_with_metal(path_to_sdf=test_sdf,

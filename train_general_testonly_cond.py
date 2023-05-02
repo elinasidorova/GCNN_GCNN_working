@@ -9,7 +9,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.nn import MFConv, global_mean_pool
 
 from Source.data import get_num_node_features, get_num_metal_features, get_num_targets, get_batch_size
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal_and_conditions, ConvMolFeaturizer, \
+from Source.featurizers.featurizers import featurize_sdf_with_metal_and_conditions, ConvMolFeaturizer, \
     SkipatomFeaturizer
 from Source.metal_ligand_concat import max_unifunc
 from Source.models.GCNN_bimodal import MolGraphHeteroNet

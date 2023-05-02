@@ -1,16 +1,19 @@
+import json
 from inspect import signature
 
 import torch.nn as nn
 import torch.optim.optimizer
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.nn.conv import MFConv, GCNConv, GraphConv
-from torch_geometric.nn import global_max_pool as gmp, global_mean_pool as gap, BatchNorm, Sequential
+from torch_geometric.nn import global_max_pool, global_mean_pool, BatchNorm, Sequential
 from torch_geometric.utils import add_self_loops
 from torch_geometric.nn.pool import TopKPooling
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from torch import sqrt
 import warnings
+
+from Source.models.global_poolings import ConcatPooling
 
 
 class MolGraphNet(LightningModule):
@@ -215,7 +218,7 @@ class MolGraphHeteroNet(LightningModule):
                  hidden_pre_fc=(64,), pre_fc_dropout=0, pre_fc_actf=nn.LeakyReLU(),
                  hidden_conv=(64,), conv_dropout=0, conv_actf=nn.LeakyReLU(),
                  hidden_post_fc=(64,), post_fc_dropout=0, post_fc_bn=False, post_fc_actf=nn.LeakyReLU(),
-                 conv_layer=MFConv, graph_pooling=gap, global_pooling=concat_unifunc,
+                 conv_layer=MFConv, conv_parameters=None, graph_pooling=global_mean_pool, global_pooling=ConcatPooling,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
         super(MolGraphHeteroNet, self).__init__()
 
@@ -225,17 +228,16 @@ class MolGraphHeteroNet(LightningModule):
         self.batch_size = batch_size
 
         self.conv_layer = conv_layer
+        self.conv_parameters = conv_parameters or {}
         self.hidden_conv = hidden_conv
         self.conv_dropout = conv_dropout
         self.conv_actf = conv_actf
-        self.graph_pooling = graph_pooling
 
         self.hidden_fc_metal = hidden_metal_fc
         self.metal_fc_bn = metal_fc_bn
         self.metal_fc_dropout = metal_fc_dropout
         self.metal_fc_actf = metal_fc_actf
 
-        self.global_pooling = global_pooling
 
         self.hidden_post_fc = hidden_post_fc
         self.post_fc_bn = post_fc_bn
@@ -243,38 +245,42 @@ class MolGraphHeteroNet(LightningModule):
         self.post_fc_actf = post_fc_actf
 
         self.optimizer = optimizer
-        self.optimizer_parameters = optimizer_parameters
+        self.optimizer_parameters = optimizer_parameters or {}
         self.mode = mode
-
-        if self.mode == "regression":
-            self.loss = lambda *args, **kwargs: sqrt(F.mse_loss(*args, **kwargs))
-        elif self.mode == "binary_classification":
-            self.loss = F.binary_cross_entropy
-        elif self.mode == "multy_classification":
-            self.loss = F.cross_entropy
-        else:
-            raise ValueError(
-                "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed")
 
         self.pre_fc_sequential = self.make_fc_blocks(hidden_dims=(node_features, *hidden_pre_fc),
                                                      actf=pre_fc_actf,
                                                      batch_norm=False,
                                                      dropout=pre_fc_dropout)
-
-        self.metal_fc_sequential = self.make_fc_blocks(hidden_dims=(metal_features, *hidden_metal_fc),
-                                                       actf=metal_fc_actf,
-                                                       batch_norm=metal_fc_bn,
-                                                       dropout=metal_fc_dropout)
-
         self.conv_sequential = self.make_conv_blocks(hidden_dims=(hidden_pre_fc[-1], *hidden_conv),
                                                      actf=conv_actf,
                                                      layer=conv_layer,
                                                      layer_parameters=conv_parameters,
                                                      dropout=conv_dropout)
-        self.post_fc_sequential = self.make_fc_blocks(hidden_dims=(hidden_conv[-1], *hidden_post_fc),
+        self.graph_pooling = graph_pooling
+        self.metal_fc_sequential = self.make_fc_blocks(hidden_dims=(metal_features, *hidden_metal_fc),
+                                                       actf=metal_fc_actf,
+                                                       batch_norm=metal_fc_bn,
+                                                       dropout=metal_fc_dropout)
+        self.global_pooling = global_pooling(input_dims=(hidden_conv[-1], hidden_metal_fc[-1]))
+        self.post_fc_sequential = self.make_fc_blocks(hidden_dims=(self.global_pooling.output_dim, *hidden_post_fc),
                                                       actf=post_fc_actf,
                                                       batch_norm=post_fc_bn,
                                                       dropout=post_fc_dropout)
+
+        if self.mode == "regression":
+            self.out_sequential = nn.Sequential(nn.Linear(hidden_post_fc[-1], num_targets))
+            self.loss = lambda *args, **kwargs: sqrt(F.mse_loss(*args, **kwargs))
+        elif self.mode == "binary_classification":
+            self.out_sequential = nn.Sequential(nn.Linear(hidden_post_fc[-1], num_targets), nn.Sigmoid())
+            self.loss = F.binary_cross_entropy
+        elif self.mode == "multy_classification":
+            self.out_sequential = nn.Sequential(nn.Linear(hidden_post_fc[-1], num_targets), nn.Softmax())
+            self.loss = F.cross_entropy
+        else:
+            raise ValueError(
+                "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed")
+
 
         self.valid_losses = []
         self.train_losses = []
@@ -303,21 +309,16 @@ class MolGraphHeteroNet(LightningModule):
                        for i in range(len(hidden_dims) - 1)]
         return Sequential("x, edge_index", conv_layers)
 
-    def forward(self, graph, batch=None):
-        x, edge_index = graph.x, graph.edge_index
-        if graph.metal_x
-            edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
-        metal_x = self.metal_sequential(metal_x)
+    def forward(self, graph):
+        x, edge_index, metal_x, batch = graph.x, graph.edge_index, graph.metal_x, graph.batch
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
+        x = self.pre_fc_sequential(x)
         x = self.conv_sequential(x, edge_index)
-        if hasattr(self.graph_pooling, "forward") and "edge_index" in signature(self.graph_pooling.forward).parameters:
-            x = self.graph_pooling(x, edge_index, batch=batch)[0]
-        elif "edge_index" in signature(self.graph_pooling).parameters:
-            x = self.graph_pooling(x, edge_index, batch=batch)
-        else:
-            x = self.graph_pooling(x, batch=batch)
-        x = self.global_pooling(metal_x, x)
-        x = self.lin_sequential(x)
-        return x
+        x = self.graph_pooling(x, batch=batch)
+        metal_x = self.metal_fc_sequential(metal_x)
+        general = self.global_pooling(x, metal_x)
+        general = self.post_fc_sequential(general)
+        return general
 
     def configure_optimizers(self):
         optimizer = self.optimizer(self.parameters(), **self.optimizer_parameters)
@@ -342,66 +343,11 @@ class MolGraphHeteroNet(LightningModule):
         self.log('val_loss', loss, batch_size=self.batch_size)
         return loss
 
-    def get_architecture(self):
-        return {"conv_layer": self.conv_layer,
-                "hidden_conv": self.hidden_conv,
-                "hidden_fc": self.hidden_fc,
-                "hidden_metal": self.hidden_fc_metal,
-                "n_conv": self.n_conv,
-                "n_fc": self.n_fc,
-                "conv_dropout": self.conv_dropout,
-                "fc_dropout": self.fc_dropout,
-                "metal_dropout": self.metal_fc_dropout,
-                "fc_bn": self.fc_bn,
-                "conv_actf": self.conv_actf,
-                "fc_actf": self.fc_actf,
-                "optimizer": self.optimizer,
-                }
-
-    def freeze_layers(self, number_of_layers: int) -> None:
-        n_c = self.n_conv
-        n_l = self.n_fc
-        parameters = list(self.named_parameters())
-        if number_of_layers <= n_c:
-            for i in range(number_of_layers):
-                for name, tensor in parameters:
-                    if name.startswith(f"conv_sequential.module_{i}"):
-                        tensor.requires_grad = False
-
-        elif n_c + n_l >= number_of_layers > n_c:
-            for i in range(n_c):
-                for name, tensor in parameters:
-                    if name.startswith(f"conv_sequential.module_{i}"):
-                        tensor.requires_grad = False
-            for i in range(number_of_layers - n_c):
-                for name, tensor in parameters:
-                    if name.startswith(f"lin_sequential.{i}"):
-                        tensor.requires_grad = False
-        else:
-            warnings.warn("Number of layers in model lower than requested freeze number")
-            for name, tensor in parameters:
-                tensor.requires_grad = False
-
     def get_model_structure(self):
-        return {
-            "node_features": self.node_features,
-            "metal_features": self.hidden_fc_metal[0],
-            "num_targets": self.num_targets,
-            "batch_size": self.batch_size,
-            "conv_layer": self.conv_layer.__name__,
-            "metal_ligand_unifunc": self.global_pooling.__name__,
-            "hidden_metal": self.hidden_fc_metal,
-            "hidden_conv": self.hidden_conv,
-            "hidden_fc": self.hidden_fc,
-            "metal_dropout": self.metal_fc_dropout,
-            "conv_dropout": self.conv_dropout,
-            "fc_dropout": self.fc_dropout,
-            "pooling_layer": self.graph_pooling.__name__ if hasattr(
-                self.graph_pooling,
-                "__name__",
-            ) else type(self.graph_pooling).__name__,
-            "conv_actf": str(self.conv_actf),
-            "fc_actf": str(self.fc_actf),
-            "fc_bn": self.fc_bn,
-            "optimizer": self.optimizer.__name__,
-        }
+        def is_jsonable(x):
+            try:
+                json.dumps(x)
+                return True
+            except (TypeError, OverflowError):
+                return False
+        return {key: value if is_jsonable(value) else str(value) for key, value in self.config.items()}

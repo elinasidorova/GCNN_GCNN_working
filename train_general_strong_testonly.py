@@ -9,7 +9,7 @@ from Source.data import train_test_valid_split, get_num_node_features, get_batch
     get_num_metal_features
 from Source.metal_ligand_concat import max_unifunc
 from Source.models.GCNN_bimodal import MolGraphHeteroNet
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
 from Source.trainer import MolGraphHeteroNetTrainer
 
 

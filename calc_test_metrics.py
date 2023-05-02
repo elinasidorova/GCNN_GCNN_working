@@ -10,7 +10,7 @@ from torch_geometric.data import Batch
 sys.path.append("Source")
 
 from Source.models.GCNN_bimodal import MolGraphHeteroNet
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
 
 
 def create_path(path):

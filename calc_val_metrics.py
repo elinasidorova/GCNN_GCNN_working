@@ -12,7 +12,7 @@ import torch
 from sklearn.metrics import r2_score
 from torch_geometric.data import Batch
 from Source.models.GCNN_bimodal import MolGraphHeteroNet
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
 
 
 def create_path(path):

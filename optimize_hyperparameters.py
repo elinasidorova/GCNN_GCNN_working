@@ -17,7 +17,7 @@ from Source.data import get_num_node_features, get_num_metal_features, get_num_t
     get_batch_size
 from Source.metal_ligand_concat import mean_unifunc, max_unifunc
 from Source.models.GCNN_bimodal import MolGraphHeteroNet
-from Source.featurizers.mol_featurizer import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
+from Source.featurizers.featurizers import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
 from Source.trainer import MolGraphHeteroNetTrainer
 
 train_sdf = "Data/OptunaMgCdLa/train_trans.sdf"
