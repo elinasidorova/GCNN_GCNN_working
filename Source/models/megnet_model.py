@@ -342,7 +342,7 @@ class MEGNet(LightningModule):
     def training_step(self, train_batch, *args, **kwargs):
         logits = self.forward(train_batch)
         loss = self.loss(train_batch.y, logits)
-        self.log('train_loss', loss, batch_size=self.batch_size)
+        self.log('train_loss', loss, batch_size=self.batch_size, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):

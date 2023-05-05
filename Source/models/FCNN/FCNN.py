@@ -10,16 +10,16 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 class FCNN(LightningModule):
-    def __init__(self, input_features, num_targets, batch_size,
+    def __init__(self, input_features, num_targets,
                  hidden=(64,), dropout=0, use_bn=False, actf=nn.LeakyReLU(),
                  use_out_sequential=True,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
         super(FCNN, self).__init__()
-        self.config = {name: locals()[name] for name in signature(self.__init__).parameters.keys()}
+        param_values = locals()
+        self.config = {name: param_values[name] for name in signature(self.__init__).parameters.keys()}
 
         self.input_features = input_features
         self.num_targets = num_targets
-        self.batch_size = batch_size
 
         self.hidden = hidden
         self.use_bn = use_bn
@@ -88,21 +88,23 @@ class FCNN(LightningModule):
     def training_step(self, train_batch, *args, **kwargs):
         x, y = train_batch
         loss = self.loss(y, self.forward(x).reshape(*y.shape))
-        self.log('train_loss', loss, batch_size=self.batch_size)
+        self.log('train_loss', loss, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
         x, y = val_batch
         loss = self.loss(y, self.forward(x).reshape(*y.shape))
-        self.log('val_loss', loss, batch_size=self.batch_size)
+        self.log('val_loss', loss)
         return loss
 
     def get_model_structure(self):
-        def is_jsonable(x):
+        def make_jsonable(x):
             try:
                 json.dumps(x)
-                return True
+                return x
             except (TypeError, OverflowError):
-                return False
+                if isinstance(x, dict):
+                    return {key: make_jsonable(value) for key, value in x.items()}
+                return str(x)
 
-        return {key: value if is_jsonable(value) else str(value) for key, value in self.config.items()}
+        return make_jsonable(self.config)

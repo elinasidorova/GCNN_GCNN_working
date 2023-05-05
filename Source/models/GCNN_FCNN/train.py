@@ -15,10 +15,9 @@ from Source.models.global_poolings import ConcatPooling
 
 sys.path.append(os.path.abspath("../../../"))
 
-from model_oldversion import GCNNBimodal
+from model import GCNNBimodal
 from trainer import GCNNTrainer
-from Source.data import get_num_node_features, get_num_metal_features, \
-    balanced_train_test_valid_split
+from Source.data import balanced_train_test_valid_split
 from Source.featurizers.featurizers import DGLFeaturizer, SkipatomFeaturizer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -43,27 +42,34 @@ target_metrics = {
     } for target in targets
 }
 model_parameters = {
-    "hidden_metal_fc": (64,),
-    "metal_fc_dropout": 0,
-    "metal_fc_bn": False,
-    "metal_fc_actf": nn.LeakyReLU(),
-    "hidden_pre_fc": (),
-    "pre_fc_dropout": None,
-    "pre_fc_actf": None,
-    "hidden_conv": (64,),
-    "conv_dropout": 0,
-    "conv_actf": nn.LeakyReLU(),
-    "hidden_post_fc": (64,),
-    "post_fc_dropout": 0,
-    "post_fc_bn": False,
-    "post_fc_actf": nn.LeakyReLU(),
-    "conv_layer": MFConv,
-    "conv_parameters": None,
-    "graph_pooling": global_mean_pool,
+    "metal_fc_params": {
+        "hidden": (64,),
+        "dropout": 0,
+        "use_bn": False,
+        "actf": nn.LeakyReLU(),
+    },
+    "gcnn_params": {
+        "hidden_pre_fc": (64,),
+        "pre_fc_dropout": 0,
+        "pre_fc_actf": nn.LeakyReLU(),
+        "hidden_conv": (64,),
+        "conv_dropout": 0,
+        "conv_actf": nn.LeakyReLU(),
+        "hidden_post_fc": (64,),
+        "post_fc_dropout": 0,
+        "post_fc_bn": False,
+        "post_fc_actf": nn.LeakyReLU(),
+        "conv_layer": MFConv,
+        "conv_parameters": None,
+        "graph_pooling": global_mean_pool
+    },
+    "post_fc_params": {
+        "hidden": (64,),
+        "dropout": 0,
+        "use_bn": False,
+        "actf": nn.LeakyReLU(),
+    },
     "global_pooling": ConcatPooling,
-    "optimizer": torch.optim.Adam,
-    "optimizer_parameters": None,
-    "mode": "regression"
 }
 
 test_metal = "Cu"  # sys.argv[1]
@@ -71,7 +77,7 @@ test_metal = "Cu"  # sys.argv[1]
 transition_metals = ["Mg", "Al", "Ca", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Y", "Ag", "Cd", "Hg", "Pb", "Bi"]
 Ln_metals = ["La", "Ce", "Pr", "Nd", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
 Ac_metals = ["Th", "Am", "Cm", "Bk", "Cf"]  # "U", "Pu",
-all_metals = ["La"] # transition_metals + Ln_metals + Ac_metals
+all_metals = ["La"]  # transition_metals + Ln_metals + Ac_metals
 
 logging.info("Featurizig...")
 train_datasets = [featurize_sdf_with_metal(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
@@ -92,11 +98,13 @@ test_loader = DataLoader(featurize_sdf_with_metal(
     batch_size=batch_size)
 
 model = GCNNBimodal(
-    node_features=get_num_node_features(folds[0][0]),
-    metal_features=get_num_metal_features(folds[0][0]),
+    metal_features=next(iter(test_loader)).metal_x.shape[-1],
+    node_features=next(iter(test_loader)).x.shape[-1],
     num_targets=len(targets),
-    batch_size=batch_size,
     **model_parameters,
+    optimizer=torch.optim.Adam,
+    optimizer_parameters=None,
+    mode="regression",
 )
 
 trainer = GCNNTrainer(

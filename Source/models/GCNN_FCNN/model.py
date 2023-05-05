@@ -1,17 +1,13 @@
 import json
+import warnings
 from inspect import signature
 
 import torch.nn as nn
-import torch.optim.optimizer
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch_geometric.nn.conv import MFConv, GCNConv, GraphConv
-from torch_geometric.nn import global_max_pool, global_mean_pool, BatchNorm, Sequential
-from torch_geometric.utils import add_self_loops
-from torch_geometric.nn.pool import TopKPooling
 import torch.nn.functional as F
+import torch.optim.optimizer
 from pytorch_lightning import LightningModule
 from torch import sqrt
-import warnings
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from Source.models.FCNN.FCNN import FCNN
 from Source.models.GCNN.GCNN import GCNN
@@ -19,31 +15,41 @@ from Source.models.global_poolings import ConcatPooling
 
 
 class GCNNBimodal(LightningModule):
-    def __init__(self, num_targets, batch_size,
+    def __init__(self, metal_features, node_features, num_targets,
                  metal_fc_params=None, gcnn_params=None, post_fc_params=None, global_pooling=ConcatPooling,
-                 use_out_sequential = True,
+                 use_out_sequential=True,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
         super(GCNNBimodal, self).__init__()
         param_values = locals()
         self.config = {name: param_values[name] for name in signature(self.__init__).parameters.keys()}
 
         self.num_targets = num_targets
-        self.batch_size = batch_size
         self.use_out_sequential = use_out_sequential
 
         self.optimizer = optimizer
         self.optimizer_parameters = optimizer_parameters or {}
         self.mode = mode
 
-        gcnn_params["use_out_sequential"] = False
-        metal_fc_params["use_out_sequential"] = False
-        post_fc_params["use_out_sequential"] = False
+        # preparing params for model blocks
+        for p in [metal_fc_params, gcnn_params, post_fc_params]:
+            if "num_targets" in p:
+                warnings.warn(
+                    "Not recommended to set 'num_targets' in model blocks as far as it doesn't affect anything",
+                    DeprecationWarning)
+            if "use_out_sequential" in p:
+                warnings.warn("'use_out_sequential' parameter forcibly set to False", DeprecationWarning)
+            p["use_out_sequential"] = False
+            p["num_targets"] = 1
 
+        metal_fc_params["input_features"] = metal_features
+        gcnn_params["node_features"] = node_features
         self.graph_sequential = GCNN(**gcnn_params)
         self.metal_fc_sequential = FCNN(**metal_fc_params)
 
         self.global_pooling = global_pooling(input_dims=(self.graph_sequential.output_dim,
                                                          self.metal_fc_sequential.output_dim))
+
+        post_fc_params["input_features"] = self.global_pooling.output_dim
 
         self.post_fc_sequential = FCNN(**post_fc_params)
 
@@ -73,7 +79,7 @@ class GCNNBimodal(LightningModule):
         self.train_losses = []
 
     def forward(self, graph):
-        x = self.gcnn_sequential(graph)
+        x = self.graph_sequential(graph)
         metal_x = self.metal_fc_sequential(graph.metal_x)
         general = self.global_pooling(x, metal_x)
         general = self.post_fc_sequential(general)
@@ -95,13 +101,13 @@ class GCNNBimodal(LightningModule):
     def training_step(self, train_batch, *args, **kwargs):
         logits = self.forward(train_batch)
         loss = self.loss(train_batch.y, logits.reshape(*train_batch.y.shape))
-        self.log('train_loss', loss, batch_size=self.batch_size)
+        self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
         logits = self.forward(val_batch)
         loss = self.loss(val_batch.y, logits.reshape(*val_batch.y.shape))
-        self.log('val_loss', loss, batch_size=self.batch_size)
+        self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
         return loss
 
     def get_model_structure(self):
@@ -110,8 +116,8 @@ class GCNNBimodal(LightningModule):
                 json.dumps(x)
                 return x
             except (TypeError, OverflowError):
-                if type(x) == dict:
-                    return {key: make_jsonable(value) for key, value in x}
+                if isinstance(x, dict):
+                    return {key: make_jsonable(value) for key, value in x.items()}
                 return str(x)
 
         return make_jsonable(self.config)

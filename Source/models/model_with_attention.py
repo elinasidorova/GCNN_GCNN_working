@@ -356,7 +356,7 @@ class MolGraphHeteroNet(LightningModule):
     def training_step(self, train_batch, *args, **kwargs):
         logits = self.forward(train_batch.x, train_batch.edge_index, train_batch.metal_x, batch=train_batch.batch)
         loss = self.loss(train_batch.y, logits.reshape(*train_batch.y.shape))
-        self.log('train_loss', loss, batch_size=self.batch_size)
+        self.log('train_loss', loss, batch_size=self.batch_size, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):

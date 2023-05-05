@@ -13,7 +13,7 @@ from torch_geometric.utils import add_self_loops
 
 
 class GCNN(LightningModule):
-    def __init__(self, node_features, num_targets, batch_size,
+    def __init__(self, node_features, num_targets,
                  hidden_pre_fc=(64,), pre_fc_dropout=0, pre_fc_actf=nn.LeakyReLU(),
                  hidden_conv=(64,), conv_dropout=0, conv_actf=nn.LeakyReLU(),
                  hidden_post_fc=(64,), post_fc_dropout=0, post_fc_bn=False, post_fc_actf=nn.LeakyReLU(),
@@ -21,11 +21,11 @@ class GCNN(LightningModule):
                  use_out_sequential=True,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
         super(GCNN, self).__init__()
-        self.config = {name: locals()[name] for name in signature(self.__init__).parameters.keys()}
+        param_values = locals()
+        self.config = {name: param_values[name] for name in signature(self.__init__).parameters.keys()}
 
         self.node_features = node_features
         self.num_targets = num_targets
-        self.batch_size = batch_size
 
         self.conv_layer = conv_layer
         self.conv_parameters = conv_parameters or {}
@@ -54,31 +54,35 @@ class GCNN(LightningModule):
                                                      layer_parameters=conv_parameters,
                                                      dropout=conv_dropout)
         self.graph_pooling = graph_pooling
-        self.post_fc_sequential = self.make_fc_blocks(hidden_dims=(self.global_pooling.output_dim, *hidden_post_fc),
-                                                      actf=post_fc_actf,
-                                                      batch_norm=post_fc_bn,
-                                                      dropout=post_fc_dropout)
+        self.post_fc_sequential = self.make_fc_blocks(
+            hidden_dims=((node_features, *hidden_pre_fc, *hidden_conv)[-1], *hidden_post_fc),
+            actf=post_fc_actf,
+            batch_norm=post_fc_bn,
+            dropout=post_fc_dropout)
 
         if self.use_out_sequential:
             self.output_dim = num_targets
             if self.mode == "regression":
                 self.out_sequential = nn.Sequential(
-                    nn.Linear((self.global_pooling.output_dim, *hidden_post_fc)[-1], num_targets))
+                    nn.Linear((node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc, *hidden_post_fc)[-1],
+                              num_targets))
                 self.loss = lambda *args, **kwargs: sqrt(F.mse_loss(*args, **kwargs))
             elif self.mode == "binary_classification":
                 self.out_sequential = nn.Sequential(
-                    nn.Linear((self.global_pooling.output_dim, *hidden_post_fc)[-1], num_targets), nn.Sigmoid())
+                    nn.Linear((node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc, *hidden_post_fc)[-1],
+                              num_targets), nn.Sigmoid())
                 self.loss = F.binary_cross_entropy
             elif self.mode == "multy_classification":
                 self.out_sequential = nn.Sequential(
-                    nn.Linear((self.global_pooling.output_dim, *hidden_post_fc)[-1], num_targets), nn.Softmax())
+                    nn.Linear((node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc, *hidden_post_fc)[-1],
+                              num_targets), nn.Softmax())
                 self.loss = F.cross_entropy
             else:
                 raise ValueError(
                     "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed")
         else:
             self.out_sequential = nn.Sequential()
-            self.output_dim = (self.global_pooling.output_dim, *hidden_post_fc)[-1]
+            self.output_dim = (node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc)[-1]
 
         self.valid_losses = []
         self.train_losses = []
@@ -132,21 +136,23 @@ class GCNN(LightningModule):
     def training_step(self, train_batch, *args, **kwargs):
         logits = self.forward(train_batch)
         loss = self.loss(train_batch.y, logits.reshape(*train_batch.y.shape))
-        self.log('train_loss', loss, batch_size=self.batch_size)
+        self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
         logits = self.forward(val_batch)
         loss = self.loss(val_batch.y, logits.reshape(*val_batch.y.shape))
-        self.log('val_loss', loss, batch_size=self.batch_size)
+        self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
         return loss
 
     def get_model_structure(self):
-        def is_jsonable(x):
+        def make_jsonable(x):
             try:
                 json.dumps(x)
-                return True
+                return x
             except (TypeError, OverflowError):
-                return False
+                if isinstance(x, dict):
+                    return {key: make_jsonable(value) for key, value in x.items()}
+                return str(x)
 
-        return {key: value if is_jsonable(value) else str(value) for key, value in self.config.items()}
+        return make_jsonable(self.config)

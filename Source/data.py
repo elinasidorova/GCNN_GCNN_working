@@ -1,7 +1,6 @@
 import random
 
 from sklearn.model_selection import KFold, train_test_split
-from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 
 
@@ -68,47 +67,3 @@ def train_test_valid_split(dataset, n_splits=5, test_ratio=0.2, batch_size=64, s
         valid_loader = DataLoader([val for i, val in enumerate(dataset) if i in valid_index], batch_size=batch_size)
         folds += [(train_loader, valid_loader)]
     return folds, test_loader
-
-
-def get_num_node_features(dataset):
-    if isinstance(dataset, list) or isinstance(dataset, tuple):
-        dataset = dataset[0]
-    if isinstance(dataset, DataLoader):
-        dataset = next(iter(dataset))
-    if isinstance(dataset, Data):
-        return dataset.x.shape[1]
-    else:
-        raise TypeError(f"Invalid input dataset type: {type(dataset)}")
-
-
-def get_num_metal_features(dataset):
-    if isinstance(dataset, list) or isinstance(dataset, tuple):
-        dataset = dataset[0]
-    if isinstance(dataset, DataLoader):
-        dataset = next(iter(dataset))
-    if isinstance(dataset, Data):
-        return dataset.metal_x.shape[1]
-    else:
-        raise TypeError(f"Invalid input dataset type: {type(dataset)}")
-
-
-def get_num_targets(dataset):
-    if isinstance(dataset, list) or isinstance(dataset, tuple):
-        dataset = dataset[0]
-    if isinstance(dataset, DataLoader):
-        dataset = next(iter(dataset))
-    if isinstance(dataset, Data):
-        return 1 if len(dataset.y.shape) == 1 else dataset.y.shape[1]
-    else:
-        raise TypeError(f"Invalid input dataset type: {type(dataset)}")
-
-
-def get_batch_size(dataset):
-    if isinstance(dataset, list) or isinstance(dataset, tuple):
-        dataset = dataset[0]
-    if isinstance(dataset, DataLoader):
-        dataset = next(iter(dataset))
-    if isinstance(dataset, Data):
-        return len(dataset.batch.unique())
-    else:
-        raise TypeError(f"Invalid input dataset type: {type(dataset)}")
