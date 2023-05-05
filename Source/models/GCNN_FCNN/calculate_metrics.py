@@ -7,12 +7,12 @@ from sklearn.metrics import r2_score
 from torch import nn
 from torch_geometric.data import Batch
 
-from Source.models.GCNN_bimodal.GCNN_bimodal_trainer import GCNNTrainer
+from Source.models.GCNN_FCNN.trainer import GCNNTrainer
 from Source.trainer import ModelShell
 
 sys.path.append("Source")
 
-from Source.models.GCNN_bimodal import GCNN_bimodal
+from Source.models.GCNN_FCNN import model_oldversion
 from Source.featurizers.featurizers import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
 
 

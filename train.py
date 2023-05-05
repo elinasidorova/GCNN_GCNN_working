@@ -9,7 +9,7 @@ from Source.metal_ligand_concat import concat_unifunc
 sys.path.append("Source")
 
 from Source.trainer import MolGraphHeteroNetTrainer
-from Source.models.GCNN_bimodal.GCNN_bimodal import MolGraphHeteroNet
+from Source.models.GCNN_FCNN.model_oldversion import GCNNBimodal
 from Source.data import train_test_valid_split, get_num_node_features, get_num_metal_features, get_num_targets, \
     get_batch_size
 from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
@@ -38,7 +38,7 @@ featurized_test = featurize_sdf_with_metal(path_to_sdf=test_sdf,
                                            metal_featurizer=SkipatomFeaturizer("Source/featurizers/skipatom_vectors_dim200.torch"))
 test_data = DataLoader(featurized_test, batch_size=batch_size)
 
-model = MolGraphHeteroNet(
+model = GCNNBimodal(
     node_features=get_num_node_features(folds[0][0]),
     metal_features=get_num_metal_features(folds[0][0]),
     num_targets=get_num_targets(folds[0][0]),

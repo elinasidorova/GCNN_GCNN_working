@@ -12,7 +12,7 @@ from Source.data import get_num_node_features, get_num_metal_features, get_num_t
 from Source.featurizers.featurizers import featurize_sdf_with_metal_and_conditions, ConvMolFeaturizer, \
     SkipatomFeaturizer
 from Source.metal_ligand_concat import max_unifunc
-from Source.models.GCNN_bimodal import MolGraphHeteroNet
+from Source.models.GCNN_FCNN import MolGraphHeteroNet
 from Source.trainer import MolGraphHeteroNetTrainer
 
 

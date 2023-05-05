@@ -7,7 +7,7 @@ from torch_geometric.nn import global_max_pool, MFConv
 sys.path.append("Source")
 
 from Source.trainer import ModelTrainer
-from Source.models.GCNN_bimodal import MolGraphNet
+from Source.models.GCNN_FCNN import MolGraphNet
 from Source.data import train_test_valid_split, get_num_node_features, get_num_targets, \
     get_batch_size
 from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer

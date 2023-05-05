@@ -9,7 +9,7 @@ from torch_geometric.data import Batch
 
 sys.path.append("Source")
 
-from Source.models.GCNN_bimodal import MolGraphHeteroNet
+from Source.models.GCNN_FCNN import MolGraphHeteroNet
 from Source.featurizers.featurizers import featurize_sdf_with_metal, ConvMolFeaturizer, SkipatomFeaturizer
 
 

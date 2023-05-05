@@ -12,7 +12,7 @@ import torch
 from sklearn.metrics import r2_score
 from torch import nn
 from torch_geometric.data import Batch
-from Source.models.GCNN_bimodal import MolGraphHeteroNet
+from Source.models.GCNN_FCNN import MolGraphHeteroNet
 from Source.featurizers.featurizers import featurize_sdf_with_metal, SkipatomFeaturizer, ConvMolFeaturizer
 
 

@@ -1,7 +1,7 @@
 import json
 import torch
 import os
-from Source.models.GCNN_bimodal.GCNN_bimodal import MolGraphNet
+from Source.models.GCNN_FCNN.model_oldversion import MolGraphNet
 import pandas as pd
 from torch_geometric.data import Batch
 

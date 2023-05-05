@@ -37,7 +37,7 @@ class SkipatomFeaturizer:
         get skipatom features for given element
     """
 
-    def __init__(self, vectors_filename="Source/featurizers/skipatom_vectors_dim200.json"):
+    def __init__(self, vectors_filename="skipatom_vectors_dim200.json"):
         with open(vectors_filename, "r") as f:
             self.get_vector = json.load(f)
 
