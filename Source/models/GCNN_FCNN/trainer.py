@@ -24,16 +24,12 @@ class GCNNTrainer(ModelTrainer):
             valid_batch = Batch.from_data_list(self.train_valid_data[fold_ind][1].dataset)
 
             # model.forward() is of shape (num_samples, num_targets)
-            valid_pred += model.forward(valid_batch.x, valid_batch.edge_index,
-                                        batch=valid_batch.batch).detach().tolist()
+            valid_pred += model.forward(valid_batch).detach().tolist()
             valid_true += valid_batch.y.tolist()
-            train_pred += model.forward(train_batch.x, train_batch.edge_index,
-                                        batch=train_batch.batch).detach().tolist()
+            train_pred += model.forward(train_batch).detach().tolist()
             train_true += train_batch.y.tolist()
 
-            test_pred += model.forward(test_batch.x,
-                                       test_batch.edge_index,
-                                       batch=test_batch.batch).detach() / len(self.models)
+            test_pred += model.forward(test_batch).detach() / len(self.models)
 
         return (np.array(train_true), np.array(valid_true), np.array(test_true),
                 np.array(train_pred), np.array(valid_pred), test_pred.numpy())

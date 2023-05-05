@@ -88,7 +88,7 @@ def featurize_sdf_with_metal(path_to_sdf, mol_featurizer, metal_featurizer, seed
 
             element_symbol = target.split("_")[-1]
             new_graph.metal_x = metal_featurizer.featurize(element_symbol)
-            new_graph.y = torch.tensor([float(mol.GetProp(target))])
+            new_graph.y = torch.tensor([[float(mol.GetProp(target))]])
             all_data += [new_graph]
     random.Random(seed).shuffle(all_data)
 
@@ -136,7 +136,7 @@ def featurize_sdf_with_metal_and_conditions(path_to_sdf, mol_featurizer, metal_f
         for element_symbol, condition_values, logK in zip(metals, conditions, logKs):
             features = copy.deepcopy(mol_features[mol_ind])
             features.metal_x = torch.cat((metal_featurizer._featurize(element_symbol), condition_values), dim=-1)
-            features.y = torch.tensor([logK])
+            features.y = torch.tensor([[logK]])
             all_data += [features]
     random.Random(seed).shuffle(all_data)
 

@@ -28,7 +28,7 @@ def balanced_train_test_valid_split(datasets, n_folds, batch_size, shuffle_every
     return list(zip(train_loaders, valid_loaders))
 
 
-def train_test_valid_split(dataset, n_splits=5, test_ratio=0.2, batch_size=64, seed=14):
+def train_test_valid_split(dataset, n_splits=5, test_ratio=0.2, batch_size=64, seed=17):
     """
     Makes KFold cross-validation
 

@@ -1,4 +1,5 @@
 import json
+import warnings
 from inspect import signature
 
 import torch.nn as nn
@@ -11,12 +12,12 @@ from torch_geometric.nn import global_mean_pool, Sequential
 from torch_geometric.nn.conv import MFConv
 from torch_geometric.utils import add_self_loops
 
+from Source.models.FCNN.model import FCNN
+
 
 class GCNN(LightningModule):
     def __init__(self, node_features, num_targets,
-                 hidden_pre_fc=(64,), pre_fc_dropout=0, pre_fc_actf=nn.LeakyReLU(),
-                 hidden_conv=(64,), conv_dropout=0, conv_actf=nn.LeakyReLU(),
-                 hidden_post_fc=(64,), post_fc_dropout=0, post_fc_bn=False, post_fc_actf=nn.LeakyReLU(),
+                 pre_fc_params=None, hidden_conv=(64,), conv_dropout=0, conv_actf=nn.LeakyReLU(), post_fc_params=None,
                  conv_layer=MFConv, conv_parameters=None, graph_pooling=global_mean_pool,
                  use_out_sequential=True,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
@@ -33,10 +34,19 @@ class GCNN(LightningModule):
         self.conv_dropout = conv_dropout
         self.conv_actf = conv_actf
 
-        self.hidden_post_fc = hidden_post_fc
-        self.post_fc_bn = post_fc_bn
-        self.post_fc_dropout = post_fc_dropout
-        self.post_fc_actf = post_fc_actf
+        # preparing params for fully connected blocks
+        for p in [pre_fc_params, post_fc_params]:
+            if "num_targets" in p:
+                warnings.warn(
+                    "Not recommended to set 'num_targets' in model blocks as far as it doesn't affect anything",
+                    DeprecationWarning)
+            if "use_out_sequential" in p:
+                warnings.warn("'use_out_sequential' parameter forcibly set to False", DeprecationWarning)
+            p["use_out_sequential"] = False
+            p["num_targets"] = 1
+        if "use_bn" in pre_fc_params and pre_fc_params["use_bn"]:
+            warnings.warn("Can't use batch normalization in FCNN on separate nodes")
+            pre_fc_params["use_bn"] = False
 
         self.use_out_sequential = use_out_sequential
 
@@ -44,58 +54,40 @@ class GCNN(LightningModule):
         self.optimizer_parameters = optimizer_parameters or {}
         self.mode = mode
 
-        self.pre_fc_sequential = self.make_fc_blocks(hidden_dims=(node_features, *hidden_pre_fc),
-                                                     actf=pre_fc_actf,
-                                                     batch_norm=False,
-                                                     dropout=pre_fc_dropout)
-        self.conv_sequential = self.make_conv_blocks(hidden_dims=((node_features, *hidden_pre_fc)[-1], *hidden_conv),
+        pre_fc_params["input_features"] = node_features
+        self.pre_fc_sequential = FCNN(**pre_fc_params)
+        self.conv_sequential = self.make_conv_blocks(hidden_dims=(self.pre_fc_sequential.output_dim, *hidden_conv),
                                                      actf=conv_actf,
                                                      layer=conv_layer,
                                                      layer_parameters=conv_parameters,
                                                      dropout=conv_dropout)
         self.graph_pooling = graph_pooling
-        self.post_fc_sequential = self.make_fc_blocks(
-            hidden_dims=((node_features, *hidden_pre_fc, *hidden_conv)[-1], *hidden_post_fc),
-            actf=post_fc_actf,
-            batch_norm=post_fc_bn,
-            dropout=post_fc_dropout)
+        post_fc_params["input_features"] = (self.pre_fc_sequential.output_dim, *hidden_conv)[-1]
+        self.post_fc_sequential = FCNN(**post_fc_params)
 
         if self.use_out_sequential:
             self.output_dim = num_targets
             if self.mode == "regression":
                 self.out_sequential = nn.Sequential(
-                    nn.Linear((node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc, *hidden_post_fc)[-1],
-                              num_targets))
+                    nn.Linear(self.post_fc_sequential.output_dim, num_targets))
                 self.loss = lambda *args, **kwargs: sqrt(F.mse_loss(*args, **kwargs))
             elif self.mode == "binary_classification":
                 self.out_sequential = nn.Sequential(
-                    nn.Linear((node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc, *hidden_post_fc)[-1],
-                              num_targets), nn.Sigmoid())
+                    nn.Linear(self.post_fc_sequential.output_dim, num_targets), nn.Sigmoid())
                 self.loss = F.binary_cross_entropy
             elif self.mode == "multy_classification":
                 self.out_sequential = nn.Sequential(
-                    nn.Linear((node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc, *hidden_post_fc)[-1],
-                              num_targets), nn.Softmax())
+                    nn.Linear(self.post_fc_sequential.output_dim, num_targets), nn.Softmax())
                 self.loss = F.cross_entropy
             else:
                 raise ValueError(
                     "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed")
         else:
             self.out_sequential = nn.Sequential()
-            self.output_dim = (node_features, *hidden_pre_fc, *hidden_conv, *hidden_post_fc)[-1]
+            self.output_dim = self.post_fc_sequential.output_dim
 
         self.valid_losses = []
         self.train_losses = []
-
-    @staticmethod
-    def make_fc_blocks(hidden_dims, actf, batch_norm=False, dropout=0.0):
-        def fc_layer(in_f, out_f):
-            layers = [nn.Linear(in_f, out_f), nn.Dropout(dropout), actf]
-            if batch_norm: layers.insert(1, nn.BatchNorm1d(out_f))
-            return nn.Sequential(*layers)
-
-        lin_layers = [fc_layer(hidden_dims[i], hidden_dims[i + 1]) for i, val in enumerate(hidden_dims[:-1])]
-        return nn.Sequential(*lin_layers)
 
     @staticmethod
     def make_conv_blocks(hidden_dims, actf, layer, layer_parameters=None, dropout=0.0):

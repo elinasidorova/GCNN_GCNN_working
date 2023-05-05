@@ -39,7 +39,6 @@ class ModelTrainer:
                  target_metrics=None):
         pytorch_lightning.seed_everything(seed)
         torch_geometric.seed_everything(seed)
-        self.mode = model.mode
         self.initial_model = model
         self.models = []
         self.train_valid_data = train_valid_data

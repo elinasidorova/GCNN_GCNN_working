@@ -9,8 +9,8 @@ from pytorch_lightning import LightningModule
 from torch import sqrt
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from Source.models.FCNN.FCNN import FCNN
-from Source.models.GCNN.GCNN import GCNN
+from Source.models.FCNN.model import FCNN
+from Source.models.GCNN.model import GCNN
 from Source.models.global_poolings import ConcatPooling
 
 
