@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader
 sys.path.append(os.path.abspath("../../../"))
 
 from model import GCNNBimodal
-from trainer import GCNNTrainer
+from Source.models.GCNN.trainer import GCNNTrainer
 from Source.trainer import ModelShell
 from Source.data import balanced_train_test_valid_split
 from Source.featurizers.featurizers import DGLFeaturizer, SkipatomFeaturizer, featurize_sdf_with_metal
