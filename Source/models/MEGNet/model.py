@@ -117,10 +117,16 @@ class MEGNet(LightningModule):
         megnet_fc_node_params["input_features"] = self.pre_fc_node_sequential.output_dim
         megnet_fc_general_params["input_features"] = self.pre_fc_general_sequential.output_dim
 
-        for p in [megnet_fc_edge_params, megnet_fc_node_params, megnet_fc_general_params]:
-            if p["hidden"][-1] != p["input_features"]:
-                raise ValueError(
-                    f"input_features and output_dim of {p.__name__} must be the same, but {p['hidden'][-1]} != {p['input_features']}")
+        for fc, conv in zip([megnet_fc_edge_params, megnet_fc_node_params, megnet_fc_general_params],
+                            [megnet_conv_edge_params, megnet_conv_node_params, megnet_conv_general_params]):
+            if fc["input_features"] != conv["hidden"][-1]:
+                warnings.warn(
+                    f"Skip-connection requires matching of FC input_features and conv output_dim, but {fc['input_features']} != {conv['hidden'][-1]}. Adding {fc['input_features']} as new output_dim.")
+                conv["hidden"] = (*conv["hidden"], fc["input_features"])
+            if fc["input_features"] != fc["hidden"][-1]:
+                warnings.warn(
+                    f"MEGNet requires matching of FC input_features and FC output_dim, but {fc['input_features']} != {fc['hidden'][-1]}. Adding {fc['input_features']} as new output_dim.")
+                fc["hidden"] = (*fc["hidden"], fc["input_features"])
 
         ##Set up GNN layers
         self.megnet_fc_edge_list = torch.nn.ModuleList([FCNN(**megnet_fc_edge_params) for _ in range(n_megnet_blocks)])
@@ -129,9 +135,9 @@ class MEGNet(LightningModule):
             FCNN(**megnet_fc_general_params) for _ in range(n_megnet_blocks)
         ])
 
-        e = self.pre_fc_edge_sequential.output_dim
-        n = self.pre_fc_node_sequential.output_dim
-        g = self.pre_fc_general_sequential.output_dim
+        e = self.megnet_fc_edge_list[0].output_dim
+        n = self.megnet_fc_node_list[0].output_dim
+        g = self.megnet_fc_general_list[0].output_dim
 
         megnet_conv_edge_params["input_features"] = 2 * n + e + g
         megnet_conv_node_params["input_features"] = n + e + g

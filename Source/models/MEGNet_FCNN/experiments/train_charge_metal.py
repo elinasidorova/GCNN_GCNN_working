@@ -29,15 +29,15 @@ all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 
               'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
 
 cv_folds = 5
-seed = 27
+seed = 23
 batch_size = 32
-epochs = 1
+epochs = 1000
 es_patience = 100
 mode = "regression"
 output_folder = ROOT_DIR / f"Output/MengetChargeMetal/{test_metal}_megnet-cond-charge-metal_{mode}_{time_mark}"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
 
-mol_featurizer = DGLFeaturizer(add_self_loop=True,
+mol_featurizer = DGLFeaturizer(add_self_loop=False,
                                node_featurizer=CanonicalAtomFeaturizer(),
                                edge_featurizer=CanonicalBondFeaturizer())
 targets = ("logK",)
