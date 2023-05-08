@@ -1,27 +1,23 @@
 import logging
-import numpy as np
 import os.path
 import sys
-import torch
 from datetime import datetime
-from dgllife.utils import CanonicalAtomFeaturizer
+
+import numpy as np
+import torch
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 
-from Source.featurizers.featurizers import featurize_sdf_with_metal
-
-from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
-from Source.models.global_poolings import ConcatPooling, MaxPooling
-from config import ROOT_DIR
-
-sys.path.append(os.path.abspath("../../../../"))
-
-from Source.models.GCNN_FCNN.model import GCNNBimodal
-from Source.models.GCNN.trainer import GCNNTrainer
+sys.path.insert(0, os.path.abspath("."))
 from Source.data import balanced_train_test_valid_split
-from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer, SkipatomFeaturizer
+from Source.models.GCNN.trainer import GCNNTrainer
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
+from Source.models.GCNN_FCNN.model import GCNNBimodal
+from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
+from Source.models.global_poolings import MaxPooling
+from config import ROOT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
@@ -32,8 +28,8 @@ batch_size = 32
 epochs = 1000
 es_patience = 100
 mode = "regression"
-output_folder = os.path.join(ROOT_DIR, f"Output/Test_{mode}_{time_mark}")
-train_sdf_folder = os.path.join(ROOT_DIR, "Data/OneM")
+output_folder = ROOT_DIR / f"Output/Check_U_1fold_{mode}_{time_mark}"
+train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
 
 max_data = None
 targets = ("logK",)
@@ -90,16 +86,16 @@ all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 
               'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
 
 logging.info("Featurizig...")
-train_datasets = [featurize_sdf_with_metal(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
-                                           mol_featurizer=ConvMolFeaturizer(),
-                                           metal_featurizer=SkipatomFeaturizer())
+train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
+                                                          mol_featurizer=ConvMolFeaturizer(),
+                                                          metal_featurizer=SkipatomFeaturizer())
                   for metal in all_metals if metal != test_metal]
 folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
                                         batch_size=batch_size,
                                         shuffle_every_epoch=True,
                                         seed=seed)
 
-test_loader = DataLoader(featurize_sdf_with_metal(
+test_loader = DataLoader(featurize_sdf_with_metal_and_conditions(
     path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
     mol_featurizer=ConvMolFeaturizer(),
     metal_featurizer=SkipatomFeaturizer()),

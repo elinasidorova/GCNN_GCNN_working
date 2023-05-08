@@ -1,36 +1,34 @@
 import logging
-import numpy as np
 import os.path
-import sys
-import torch
 from datetime import datetime
+
+import numpy as np
+import torch
 from dgllife.utils import CanonicalAtomFeaturizer
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 
-from Source.featurizers.featurizers import featurize_sdf_with_metal
-from Source.models.global_poolings import ConcatPooling
-
-sys.path.append(os.path.abspath("../../../"))
-
-from model import GCNNBimodal
-from Source.models.GCNN.trainer import GCNNTrainer
 from Source.data import balanced_train_test_valid_split
-from Source.featurizers.featurizers import DGLFeaturizer, SkipatomFeaturizer
+from Source.models.GCNN.trainer import GCNNTrainer
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, DGLFeaturizer, featurize_sdf_with_metal
+from Source.models.GCNN_FCNN.model import GCNNBimodal
+from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
+from Source.models.global_poolings import MaxPooling
+from config import ROOT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
 
-cv_folds = 5
-seed = 27
+cv_folds = 1
+seed = 23
 batch_size = 32
-epochs = 1
+epochs = 1000
 es_patience = 100
 mode = "regression"
-output_folder = f"Output/Test_{mode}_{time_mark}"
-train_sdf_folder = "../../../Data/OneM"
+output_folder = ROOT_DIR / f"Output/Test_{mode}_{time_mark}"
+train_sdf_folder = ROOT_DIR / "Data/OneM"
 
 max_data = None
 targets = ("logK",)
@@ -43,52 +41,54 @@ target_metrics = {
 }
 model_parameters = {
     "metal_fc_params": {
-        "hidden": (64,),
-        "dropout": 0,
+        "hidden": (256, 128, 128, 64, 64,),
+        "dropout": 0.25108912274809364,
         "use_bn": False,
         "actf": nn.LeakyReLU(),
     },
     "gcnn_params": {
         "pre_fc_params": {
-            "hidden": (64,),
+            "hidden": (),
             "dropout": 0,
             "actf": nn.LeakyReLU(),
         },
         "post_fc_params": {
-            "hidden": (64,),
+            "hidden": (),
             "dropout": 0,
             "use_bn": False,
             "actf": nn.LeakyReLU(),
         },
-        "hidden_conv": (64,),
-        "conv_dropout": 0,
+        "hidden_conv": (128, 128, 64,),
+        "conv_dropout": 0.27936243337975536,
         "conv_actf": nn.LeakyReLU(),
         "conv_layer": MFConv,
         "conv_parameters": None,
         "graph_pooling": global_mean_pool
     },
     "post_fc_params": {
-        "hidden": (64,),
-        "dropout": 0,
+        "hidden": (256,),
+        "dropout": 0.06698879155641034,
         "use_bn": False,
         "actf": nn.LeakyReLU(),
     },
-    "global_pooling": ConcatPooling,
+    "global_pooling": MaxPooling,
 }
 
-test_metal = "Cu"  # sys.argv[1]
+test_metal = "U"  # sys.argv[1]
 
-transition_metals = ["Mg", "Al", "Ca", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Y", "Ag", "Cd", "Hg", "Pb", "Bi"]
-Ln_metals = ["La", "Ce", "Pr", "Nd", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
-Ac_metals = ["Th", "Am", "Cm", "Bk", "Cf"]  # "U", "Pu",
-all_metals = ["La"]  # transition_metals + Ln_metals + Ac_metals
+# transition_metals = ["Mg", "Al", "Ca", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Y", "Ag", "Cd", "Hg", "Pb", "Bi"]
+# Ln_metals = ["La", "Ce", "Pr", "Nd", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
+# Ac_metals = ["Th", "Am", "Cm", "Bk", "Cf"]  # "U", "Pu",
+all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 'Ce', 'Cf', 'Cm', 'Co', 'Cr', 'Cs',
+              'Cu', 'Dy', 'Er', 'Eu', 'Fe', 'Ga', 'Gd', 'Hf', 'Hg', 'Ho', 'In', 'K', 'La', 'Li', 'Lu', 'Mg', 'Mn', 'Mo',
+              'Na', 'Nd', 'Ni', 'Np', 'Pa', 'Pb', 'Pd', 'Pm', 'Pr', 'Pt', 'Pu', 'Rb', 'Re', 'Rh', 'Sb', 'Sc', 'Sm',
+              'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
 
 logging.info("Featurizig...")
 train_datasets = [featurize_sdf_with_metal(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
                                            mol_featurizer=DGLFeaturizer(add_self_loop=False,
                                                                         node_featurizer=CanonicalAtomFeaturizer()),
-                                           metal_featurizer=SkipatomFeaturizer(
-                                               "../../featurizers/skipatom_vectors_dim200.json"))
+                                           metal_featurizer=SkipatomFeaturizer())
                   for metal in all_metals if metal != test_metal]
 folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
                                         batch_size=batch_size,
@@ -97,8 +97,9 @@ folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
 
 test_loader = DataLoader(featurize_sdf_with_metal(
     path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
-    mol_featurizer=DGLFeaturizer(add_self_loop=False, node_featurizer=CanonicalAtomFeaturizer()),
-    metal_featurizer=SkipatomFeaturizer("../../featurizers/skipatom_vectors_dim200.json")),
+    mol_featurizer=DGLFeaturizer(add_self_loop=False,
+                                 node_featurizer=CanonicalAtomFeaturizer()),
+    metal_featurizer=SkipatomFeaturizer()),
     batch_size=batch_size)
 
 model = GCNNBimodal(
