@@ -7,7 +7,7 @@ from dgllife.utils import CanonicalAtomFeaturizer
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch_geometric.loader import DataLoader
 
-sys.path.append(os.path.abspath("../../../"))
+sys.path.append(os.path.abspath("."))
 
 from model import GCNNBimodal
 from Source.models.GCNN.trainer import GCNNTrainer

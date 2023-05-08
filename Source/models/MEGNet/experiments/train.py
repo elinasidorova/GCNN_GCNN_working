@@ -13,8 +13,9 @@ from torch_geometric.loader import DataLoader
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.MEGNet.featurizers import DGLFeaturizer, SkipatomFeaturizer, featurize_sdf_with_metal
 from Source.models.MEGNet.model import MEGNet
+from config import ROOT_DIR
 
-sys.path.append(os.path.abspath("../../../"))
+sys.path.append(os.path.abspath("."))
 
 from Source.data import balanced_train_test_valid_split
 
@@ -27,8 +28,8 @@ batch_size = 32
 epochs = 1
 es_patience = 100
 mode = "regression"
-output_folder = f"Output/MEGNet_Test_{mode}_{time_mark}"
-train_sdf_folder = "../../../Data/OneM"
+output_folder = ROOT_DIR / f"Output/MEGNet_Test_{mode}_{time_mark}"
+train_sdf_folder = ROOT_DIR / "Data/OneM"
 
 max_data = None
 targets = ("logK",)
@@ -116,8 +117,7 @@ train_datasets = [featurize_sdf_with_metal(path_to_sdf=os.path.join(train_sdf_fo
                                            mol_featurizer=DGLFeaturizer(add_self_loop=False,
                                                                         node_featurizer=CanonicalAtomFeaturizer(),
                                                                         edge_featurizer=CanonicalBondFeaturizer()),
-                                           metal_featurizer=SkipatomFeaturizer(
-                                               "../../featurizers/skipatom_vectors_dim200.json"))
+                                           metal_featurizer=SkipatomFeaturizer())
                   for metal in all_metals if metal != test_metal]
 folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
                                         batch_size=batch_size,
@@ -128,7 +128,7 @@ test_loader = DataLoader(featurize_sdf_with_metal(
     path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
     mol_featurizer=DGLFeaturizer(add_self_loop=False, node_featurizer=CanonicalAtomFeaturizer(),
                                  edge_featurizer=CanonicalBondFeaturizer()),
-    metal_featurizer=SkipatomFeaturizer("../../featurizers/skipatom_vectors_dim200.json")),
+    metal_featurizer=SkipatomFeaturizer()),
     batch_size=batch_size)
 
 model = MEGNet(
