@@ -8,18 +8,27 @@ def balanced_train_test_valid_split(datasets, n_folds, batch_size, shuffle_every
     train = [[] for _ in range(n_folds)]
     val = [[] for _ in range(n_folds)]
     for dataset in datasets:
-        dataset = (dataset * n_folds)[:n_folds] if len(dataset) < n_folds else dataset
         mol_ids = list(range(len(dataset)))
         if n_folds == 1:
-            train_index, valid_index = train_test_split(mol_ids, test_size=valid_size, random_state=seed, shuffle=False)
-            train[0] += [val for i, val in enumerate(dataset) if i in train_index]
-            val[0] += [val for i, val in enumerate(dataset) if i in valid_index]
+            if len(mol_ids) < 2:
+                train[0] += [val for i, val in enumerate(dataset) if i in mol_ids]
+            else:
+                train_index, valid_index = train_test_split(mol_ids, test_size=valid_size, random_state=seed, shuffle=False)
+                train[0] += [val for i, val in enumerate(dataset) if i in train_index]
+                val[0] += [val for i, val in enumerate(dataset) if i in valid_index]
+
         else:
-            for fold_ind, (train_index, valid_index) in enumerate(KFold(n_splits=n_folds).split(mol_ids)):
-                train[fold_ind] += [val for i, val in enumerate(dataset) if i in train_index]
-                val[fold_ind] += [val for i, val in enumerate(dataset) if i in valid_index]
-                random.Random(seed).shuffle(train[fold_ind])
-                random.Random(seed).shuffle(val[fold_ind])
+            if len(mol_ids) < n_folds:
+                for fold_ind in range(n_folds):
+                    train[fold_ind] += [val for i, val in enumerate(dataset) if i in mol_ids]
+            else:
+                for fold_ind, (train_index, valid_index) in enumerate(KFold(n_splits=n_folds).split(mol_ids)):
+                    train[fold_ind] += [val for i, val in enumerate(dataset) if i in train_index]
+                    val[fold_ind] += [val for i, val in enumerate(dataset) if i in valid_index]
+
+        for fold_ind in range(n_folds):
+            random.Random(seed).shuffle(train[fold_ind])
+            random.Random(seed).shuffle(val[fold_ind])
 
     train_loaders = [DataLoader(train[fold_ind], batch_size=batch_size, shuffle=shuffle_every_epoch)
                      for fold_ind in range(n_folds)]

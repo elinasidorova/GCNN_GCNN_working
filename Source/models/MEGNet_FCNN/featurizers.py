@@ -1,66 +1,15 @@
 import copy
-import json
 import random
 
-import dgl
 import torch
-from dgllife.utils import mol_to_bigraph
 from rdkit import Chem
-from torch_geometric.utils import from_networkx
+
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer
 
 
-class DGLFeaturizer:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-
-    def featurize(self, mol):
-        dgl_graph = mol_to_bigraph(mol, **self.kwargs)
-        networkx_graph = dgl.to_networkx(dgl_graph)
-        graph = from_networkx(networkx_graph)
-        if 'h' not in dgl_graph.ndata or 'e' not in dgl_graph.edata:
-            return None
-        graph.x = dgl_graph.ndata['h']
-        graph.edge_attr = dgl_graph.edata['e']
-        graph.id = None
-        return graph
-
-
-class SkipatomFeaturizer:
-    """
-    Class for extracting element features by skipatom_models approach
-
-    Attributes
-    ----------
-    get_vector : dict
-        skipatom vectors for each element
-
-    Methods
-    ----------
-    _featurize(element : str)
-        get skipatom features for given element
-    """
-
-    def __init__(self, vectors_filename="skipatom_vectors_dim200.json"):
-        with open(vectors_filename, "r") as f:
-            self.get_vector = json.load(f)
-
-    def featurize(self, element):
-        """
-
-        Parameters
-        ----------
-        element : str
-            element to be featurized
-
-        Returns
-        -------
-            features : torch.tensor
-                features of an element obtained from skipatom approach, shape (1, 200)
-        """
-        return torch.tensor(self.get_vector[element]).unsqueeze(0)
-
-
-def featurize_sdf_with_metal_and_conditions(path_to_sdf, mol_featurizer, metal_featurizer, z_in_metal=False, seed=42):
+def featurize_sdf_with_metal_and_conditions(path_to_sdf, mol_featurizer,
+                                            metal_featurizer=SkipatomFeaturizer(),
+                                            z_in_metal=False, seed=42):
     """
     Extract molecules from .sdf file and featurize them
 

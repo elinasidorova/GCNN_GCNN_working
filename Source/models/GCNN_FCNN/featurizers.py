@@ -1,12 +1,15 @@
 import copy
 import json
 import random
+import warnings
 
 import dgl
 import torch
 from dgllife.utils import mol_to_bigraph
 from rdkit import Chem
 from torch_geometric.utils import from_networkx
+
+from config import ROOT_DIR
 
 
 class DGLFeaturizer:
@@ -17,7 +20,14 @@ class DGLFeaturizer:
         dgl_graph = mol_to_bigraph(mol, **self.kwargs)
         networkx_graph = dgl.to_networkx(dgl_graph)
         graph = from_networkx(networkx_graph)
+        if 'h' not in dgl_graph.ndata:
+            warnings.warn(f"can't featurize {Chem.MolToSmiles(mol)}: 'h' not in graph.ndata")
+            return None
+        if 'e' not in dgl_graph.edata:
+            warnings.warn(f"can't featurize {Chem.MolToSmiles(mol)}: 'e' not in graph.edata")
+            return None
         graph.x = dgl_graph.ndata['h']
+        graph.edge_attr = dgl_graph.edata['e']
         graph.id = None
         return graph
 
@@ -37,7 +47,7 @@ class SkipatomFeaturizer:
         get skipatom features for given element
     """
 
-    def __init__(self, vectors_filename="skipatom_vectors_dim200.json"):
+    def __init__(self, vectors_filename=ROOT_DIR / "Source/models/GCNN_FCNN/skipatom_vectors_dim200.json"):
         with open(vectors_filename, "r") as f:
             self.get_vector = json.load(f)
 
