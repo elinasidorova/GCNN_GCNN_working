@@ -28,7 +28,7 @@ all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 
               'Na', 'Nd', 'Ni', 'Np', 'Pa', 'Pb', 'Pd', 'Pm', 'Pr', 'Pt', 'Pu', 'Rb', 'Re', 'Rh', 'Sb', 'Sc', 'Sm',
               'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
 
-cv_folds = 5
+cv_folds = 1
 seed = 23
 batch_size = 32
 epochs = 1000
@@ -40,6 +40,7 @@ train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
 mol_featurizer = DGLFeaturizer(add_self_loop=False,
                                node_featurizer=CanonicalAtomFeaturizer(),
                                edge_featurizer=CanonicalBondFeaturizer())
+z_in_metal = True
 targets = ("logK",)
 target_metrics = {
     target: {
@@ -133,7 +134,7 @@ train_datasets = [
     featurize_sdf_with_metal_and_conditions(
         path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
         mol_featurizer=mol_featurizer,
-        z_in_metal=False,
+        z_in_metal=z_in_metal,
     ) for metal in all_metals if metal != test_metal
 ]
 folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
@@ -144,7 +145,7 @@ test_loader = DataLoader(
     featurize_sdf_with_metal_and_conditions(
         path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
         mol_featurizer=mol_featurizer,
-        z_in_metal=False,
+        z_in_metal=z_in_metal,
     ),
     batch_size=batch_size)
 

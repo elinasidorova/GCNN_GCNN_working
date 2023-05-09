@@ -16,7 +16,7 @@ check_metal() {
   return 0
 }
 for metal in "${metals[@]}"; do
-    while [ $(ps uaxw | grep "train_charge_metal.py" | grep -v grep | wc -l) -ge 4 ]; do
+    while [ $(ps uaxw | grep "train_charge_metal.py" | grep -v grep | wc -l) -ge 5 ]; do
         sleep 1
     done
     if check_metal "${metal}"; then
