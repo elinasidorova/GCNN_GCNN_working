@@ -13,7 +13,7 @@ from torch_geometric.nn import global_mean_pool, MFConv
 from Source.data import balanced_train_test_valid_split
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, DGLFeaturizer, featurize_sdf_with_metal
-from Source.models.GCNN_FCNN.model import GCNNBimodal
+from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling
 from config import ROOT_DIR
@@ -102,7 +102,7 @@ test_loader = DataLoader(featurize_sdf_with_metal(
     metal_featurizer=SkipatomFeaturizer()),
     batch_size=batch_size)
 
-model = GCNNBimodal(
+model = GCNN_FCNN(
     metal_features=next(iter(test_loader)).metal_x.shape[-1],
     node_features=next(iter(test_loader)).x.shape[-1],
     num_targets=len(targets),

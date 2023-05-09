@@ -14,7 +14,7 @@ sys.path.append(os.path.abspath("."))
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer
 from Source.models.MEGNet_FCNN.featurizers import featurize_sdf_with_metal_and_conditions
-from Source.models.MEGNet_FCNN.model import MEGNetBimodal
+from Source.models.MEGNet_FCNN.model import MEGNetFCNN
 from Source.models.global_poolings import ConcatPooling
 from Source.data import balanced_train_test_valid_split
 from config import ROOT_DIR
@@ -149,7 +149,7 @@ test_loader = DataLoader(
     ),
     batch_size=batch_size)
 
-model = MEGNetBimodal(
+model = MEGNetFCNN(
     metal_features=next(iter(test_loader)).metal_x.shape[-1],
     edge_features=next(iter(test_loader)).edge_attr.shape[-1],
     node_features=next(iter(test_loader)).x.shape[-1],

@@ -15,12 +15,12 @@ from Source.models.MEGNet.model import MEGNet
 from Source.models.global_poolings import ConcatPooling
 
 
-class MEGNetBimodal(LightningModule):
+class MEGNetFCNN(LightningModule):
     def __init__(self, metal_features, node_features, edge_features, global_features, num_targets,
                  metal_fc_params=None, megnet_params=None, post_fc_params=None, global_pooling=ConcatPooling,
                  use_out_sequential=True,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
-        super(MEGNetBimodal, self).__init__()
+        super(MEGNetFCNN, self).__init__()
         param_values = locals()
         self.config = {name: param_values[name] for name in signature(self.__init__).parameters.keys()}
 

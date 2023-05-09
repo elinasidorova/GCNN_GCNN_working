@@ -14,12 +14,12 @@ from Source.models.GCNN.model import GCNN
 from Source.models.global_poolings import ConcatPooling
 
 
-class GCNNBimodal(LightningModule):
+class GCNN_FCNN(LightningModule):
     def __init__(self, metal_features, node_features, num_targets,
                  metal_fc_params=None, gcnn_params=None, post_fc_params=None, global_pooling=ConcatPooling,
                  use_out_sequential=True,
                  optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
-        super(GCNNBimodal, self).__init__()
+        super(GCNN_FCNN, self).__init__()
         param_values = locals()
         self.config = {name: param_values[name] for name in signature(self.__init__).parameters.keys()}
 

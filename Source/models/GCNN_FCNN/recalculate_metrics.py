@@ -9,7 +9,7 @@ from torch_geometric.loader import DataLoader
 
 sys.path.append(os.path.abspath("."))
 
-from model import GCNNBimodal
+from model import GCNN_FCNN
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.trainer import ModelShell
 from Source.data import balanced_train_test_valid_split
@@ -60,7 +60,7 @@ test_loader = DataLoader(featurize_sdf_with_metal(
     batch_size=batch_size)
 
 
-super_model = ModelShell(GCNNBimodal, train_folder)
+super_model = ModelShell(GCNN_FCNN, train_folder)
 trainer = GCNNTrainer(
     model=None,
     train_valid_data=folds,

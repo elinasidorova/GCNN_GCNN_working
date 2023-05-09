@@ -10,11 +10,11 @@ from torch_geometric.nn import global_mean_pool as gap, Sequential
 from torch_geometric.nn.conv import MFConv
 from torch_geometric.utils import add_self_loops
 
-from Source.models.GCNN_FCNN.model import GCNNBimodal
+from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN_att.attentions import GlobalAddAttention
 
 
-class GCNNBimodalAtt(GCNNBimodal):
+class GCNNBimodalAtt(GCNN_FCNN):
     def __init__(self, attention_parameters=None,
                  attention_key_fc_params=None, attention_query_fc_params=None,
                  **kwargs):
