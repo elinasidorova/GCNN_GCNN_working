@@ -1,73 +1,80 @@
 import numpy as np
-from rdkit import Chem
 from sklearn.neighbors import KDTree
-from rdkit.Chem import AllChem, DataStructs
 
 
-def ecfp_molstring(molecule, radius, size):
-    """
-    Method for make molstring for ecfp fingerprint
+class knnAD:
+    def __init__(self, x_train, n_neighb=5, leaf_size=10):
+        self.x_train = x_train
+        self.n_neighb = n_neighb
+        self.leaf_size = leaf_size
 
-    :param molecule: molecule object
-    :param fptype: type, radius and size of fingerprint
-    :type fptype: dict
-    :return: molstring for ecfp fingerprint
-    """
-    arr = np.zeros((1,), dtype=int)
-    DataStructs.ConvertToNumpyArray(
-        AllChem.GetMorganFingerprintAsBitVect(
-            molecule, radius, size, useFeatures=False
-        ), arr
-    )
+        self.calc_t_values()
 
-    return arr
+    def calc_t_values(self):
+        """
+        Calculate t-values for each vector in self.x_train
+        """
+        tree, mean = self.calc_mean_dists()
+        r_ref = np.percentile(mean, 75) + 1.5 * (np.percentile(mean, 75) - np.percentile(mean, 25))
+        dist_matr, ind = tree.query(self.x_train, self.x_train.shape[0])
+        counts = []
+        for line in dist_matr:
+            condition = line[1:] < r_ref
+            counts.append(len(np.extract(condition, line[1:])))
 
+        nearest_dist, ind = tree.query(self.x_train, self.n_neighb)
+        self.t_values = []
+        for n, d in zip(counts, nearest_dist):
+            if n > 0:
+                self.t_values.append(sum(d) / n)
+            else:
+                self.t_values.append(np.nan)
 
-def comp_mean_dists(dataset: np.array, n_neighb=5, leaf_size=10):
-    tree = KDTree(dataset, leaf_size)
-    dist, ind = tree.query(dataset, k=n_neighb + 1)
-    mean = [np.mean(i) for i in dist[1:]]
-    return tree, mean
+        for i, value in enumerate(self.t_values):
+            if value is None:
+                self.t_values[i] = np.nanmin(self.t_values)
 
+    def calc_mean_dists(self):
+        tree = KDTree(self.x_train, self.leaf_size)
+        dist, ind = tree.query(self.x_train, k=self.n_neighb + 1)
+        mean = [np.mean(i) for i in dist[1:]]
+        return tree, mean
 
-def single_vec_dist(input_vector: np.array, dataset: np.array, t_values: np.array):
-    distances = [np.linalg.norm(input_vector - temp_vector) for temp_vector in dataset]
+    def vect_in_ad(self, input_vector):
+        """
+        Get AD prediction for single vector
 
-    for dist, t_val in zip(distances, t_values):
-        if dist <= t_val:
-            return True
+        Parameters
+        ----------
+        input_vector: array-like
+            vector to get an AD prediction
 
-    return False
+        Returns
+        -------
+        vect_in_ad: bool
+            True for x-inlier, False for x-outlier
 
+        """
+        distances = [np.linalg.norm(input_vector - temp_vector) for temp_vector in self.x_train]
 
-def get_dataset_ad(test_dataset: np.array, train_dataset: np.array, n_neighb=5, leaf_size=10):
-    tree, mean = comp_mean_dists(train_dataset, n_neighb, leaf_size)
-    r_ref = np.percentile(mean, 75) + 1.5 * (np.percentile(mean, 75) - np.percentile(mean, 25))
-    dist_matr, ind = tree.query(train_dataset, train_dataset.shape[0])
-    counts = []
-    for line in dist_matr:
-        condition = line[1:] < r_ref
-        counts.append(len(np.extract(condition, line[1:])))
+        for dist, t_val in zip(distances, self.t_values):
+            if dist <= t_val:
+                return True
 
-    nearest_dist, ind = tree.query(train_dataset, n_neighb)
-    t_values = []
-    for n, d in zip(counts, nearest_dist):
-        if n > 0:
-            t_values.append(sum(d) / n)
-        else:
-            t_values.append(np.nan)
+        return False
 
-    for i, value in enumerate(t_values):
-        if value is None:
-            t_values[i] = np.nanmin(t_values)
+    def get_dataset_ad(self, x_test):
+        """
+        Get AD for whole test dataset
 
-    results = [single_vec_dist(i, train_dataset, t_values) for i in test_dataset]
+        Parameters
+        ----------
+        x_test: array-like
+            Matrix with vectors for prediction
 
-    return results
-
-
-def get_sdfs_ad(test_dataset_path: str, train_dataset_path: str, n_neighb=3, leaf_size=10, finp_r=4, finp_size=512):
-    train_dataset = np.array([ecfp_molstring(mol, finp_r, finp_size) for mol in Chem.SDMolSupplier(train_dataset_path)])
-    test_dataset = np.array([ecfp_molstring(mol, finp_r, finp_size) for mol in Chem.SDMolSupplier(test_dataset_path)])
-
-    return get_dataset_ad(test_dataset, train_dataset, n_neighb, leaf_size)
+        Returns
+        -------
+        ad: np.array
+            bool array - True for x-outliers and False for x-inliers
+        """
+        return np.array([self.vect_in_ad(vect) for vect in x_test])
