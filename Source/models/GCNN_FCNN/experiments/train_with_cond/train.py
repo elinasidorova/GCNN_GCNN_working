@@ -28,14 +28,14 @@ all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 
               'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
 test_metal = sys.argv[1]
 
-cv_folds = 1
+cv_folds = 5
 seed = 23
-batch_size = 32
+batch_size = 64
 epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
-output_folder = ROOT_DIR / f"Output/WithCond/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
+output_folder = ROOT_DIR / f"Output/WithCond/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
 
 max_data = None
 targets = ("logK",)
