@@ -3,9 +3,11 @@ import os.path
 import sys
 
 import numpy as np
-from dgllife.utils import CanonicalAtomFeaturizer
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch_geometric.loader import DataLoader
+
+from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
+from config import ROOT_DIR
 
 sys.path.append(os.path.abspath("."))
 
@@ -13,7 +15,7 @@ from model import GCNN_FCNN
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.trainer import ModelShell
 from Source.data import balanced_train_test_valid_split
-from Source.featurizers.featurizers import DGLFeaturizer, SkipatomFeaturizer, featurize_sdf_with_metal
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -22,8 +24,8 @@ seed = 27
 batch_size = 32
 epochs = 1000
 es_patience = 100
-train_sdf_folder = "../../../Data/OneM"
-train_folder = "Output/Test_regression_2023_05_05_21_06_28"
+train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
+train_folder = ROOT_DIR / "Output/WithCond/La_1fold_regression_2023_05_14_13_34_39"
 
 targets = ("logK",)
 target_metrics = {
@@ -34,33 +36,31 @@ target_metrics = {
     } for target in targets
 }
 
-test_metal = "Cu"
+test_metal = "La"
 
-transition_metals = ["Mg", "Al", "Ca", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Y", "Ag", "Cd", "Hg", "Pb", "Bi"]
-Ln_metals = ["La", "Ce", "Pr", "Nd", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
-Ac_metals = ["Th", "Am", "Cm", "Bk", "Cf"]  # "U", "Pu",
-all_metals = ["La"]  # transition_metals + Ln_metals + Ac_metals
+all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 'Ce', 'Cf', 'Cm', 'Co', 'Cr', 'Cs',
+              'Cu', 'Dy', 'Er', 'Eu', 'Fe', 'Ga', 'Gd', 'Hf', 'Hg', 'Ho', 'In', 'K', 'La', 'Li', 'Lu', 'Mg', 'Mn', 'Mo',
+              'Na', 'Nd', 'Ni', 'Np', 'Pa', 'Pb', 'Pd', 'Pm', 'Pr', 'Pt', 'Pu', 'Rb', 'Re', 'Rh', 'Sb', 'Sc', 'Sm',
+              'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
+
+super_model = ModelShell(GCNN_FCNN, train_folder)
 
 logging.info("Featurizig...")
-train_datasets = [featurize_sdf_with_metal(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
-                                           mol_featurizer=DGLFeaturizer(add_self_loop=False,
-                                                                        node_featurizer=CanonicalAtomFeaturizer()),
-                                           metal_featurizer=SkipatomFeaturizer(
-                                               "../../featurizers/skipatom_vectors_dim200.json"))
+train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
+                                                          mol_featurizer=ConvMolFeaturizer(),
+                                                          metal_featurizer=SkipatomFeaturizer())
                   for metal in all_metals if metal != test_metal]
 folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
                                         batch_size=batch_size,
                                         shuffle_every_epoch=True,
                                         seed=seed)
 
-test_loader = DataLoader(featurize_sdf_with_metal(
+test_loader = DataLoader(featurize_sdf_with_metal_and_conditions(
     path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
-    mol_featurizer=DGLFeaturizer(add_self_loop=False, node_featurizer=CanonicalAtomFeaturizer()),
-    metal_featurizer=SkipatomFeaturizer("../../featurizers/skipatom_vectors_dim200.json")),
+    mol_featurizer=ConvMolFeaturizer(),
+    metal_featurizer=SkipatomFeaturizer()),
     batch_size=batch_size)
 
-
-super_model = ModelShell(GCNN_FCNN, train_folder)
 trainer = GCNNTrainer(
     model=None,
     train_valid_data=folds,
