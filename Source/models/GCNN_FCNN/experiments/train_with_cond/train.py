@@ -10,7 +10,7 @@ from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 
-sys.path.insert(0, os.path.abspath("."))
+sys.path.append(os.path.abspath("."))
 from Source.data import balanced_train_test_valid_split
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
