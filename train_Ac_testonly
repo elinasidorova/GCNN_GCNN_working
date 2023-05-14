@@ -1,9 +1,0 @@
-#!/bin/bash
-for Ac in U Pu; do
-#  for seed in 13 27 94; do
-  for i in 0 1; do
-    seed=9
-    nohup python train_Ac_testonly.py $Ac $seed $i > outs/train_Ac_testonly_${Ac}_${i}_seed${seed}.out &
-#  done
-  done
-done
