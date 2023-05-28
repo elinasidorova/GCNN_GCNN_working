@@ -1,7 +1,7 @@
 #!/bin/bash
 metals=("Sc" "Y" "La" "Ce" "Pr" "Nd" "Pm" "Sm" "Eu" "Gd" "Tb" "Dy" "Ho" "Er" "Tm" "Yb" "Lu" "Ac" "Th" "Pa" "U" "Np" "Pu" "Am" "Cm" "Bk" "Cf")
 out_folder="train_general_testonly_cond"
-output_folder="Output/WithCond/5fold"
+output_folder="Output/WithCondAdd/5fold"
 n_streems=2
 
 check_metal() {

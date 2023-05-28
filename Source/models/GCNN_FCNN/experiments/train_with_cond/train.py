@@ -34,8 +34,8 @@ batch_size = 64
 epochs = 1000
 es_patience = 100
 mode = "regression"
-train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
-output_folder = ROOT_DIR / f"Output/WithCond/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
+train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
+output_folder = ROOT_DIR / f"Output/WithCondAdd/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
 
 max_data = None
 targets = ("logK",)
