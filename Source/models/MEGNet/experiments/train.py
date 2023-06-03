@@ -17,7 +17,7 @@ from config import ROOT_DIR
 
 sys.path.append(os.path.abspath("."))
 
-from Source.data import balanced_train_test_valid_split
+from Source.data import balanced_train_valid_split
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
@@ -119,10 +119,10 @@ train_datasets = [featurize_sdf_with_metal(path_to_sdf=os.path.join(train_sdf_fo
                                                                         edge_featurizer=CanonicalBondFeaturizer()),
                                            metal_featurizer=SkipatomFeaturizer())
                   for metal in all_metals if metal != test_metal]
-folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
-                                        batch_size=batch_size,
-                                        shuffle_every_epoch=True,
-                                        seed=seed)
+folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
+                                   batch_size=batch_size,
+                                   shuffle_every_epoch=True,
+                                   seed=seed)
 
 test_loader = DataLoader(featurize_sdf_with_metal(
     path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),

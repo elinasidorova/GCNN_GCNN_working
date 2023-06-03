@@ -11,7 +11,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 
 sys.path.append(os.path.abspath("."))
-from Source.data import balanced_train_test_valid_split
+from Source.data import balanced_train_valid_split
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
@@ -86,10 +86,10 @@ train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.jo
                                                           mol_featurizer=ConvMolFeaturizer(),
                                                           metal_featurizer=SkipatomFeaturizer())
                   for metal in all_metals if metal != test_metal]
-folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
-                                        batch_size=batch_size,
-                                        shuffle_every_epoch=True,
-                                        seed=seed)
+folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
+                                   batch_size=batch_size,
+                                   shuffle_every_epoch=True,
+                                   seed=seed)
 
 test_loader = DataLoader(featurize_sdf_with_metal_and_conditions(
     path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),

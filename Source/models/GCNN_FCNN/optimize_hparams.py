@@ -235,7 +235,7 @@ def objective(trial: optuna.Trial):
         featurizer = DGLFeaturizer(add_self_loop=add_self_loop, node_featurizer=featurizer)
 
     data = featurize_csv_to_graph(path_to_csv=path_to_csv, targets=targets, featurizer=featurizer, max_data=max_data)
-    folds, test_data = train_test_valid_split(data, n_splits=cv_folds, test_ratio=0.1, batch_size=batch_size)
+    folds, test_data = train_test_valid_split(data, n_folds=cv_folds, test_ratio=0.1, batch_size=batch_size)
 
     model_parameters = FCNNParams(
         trial,

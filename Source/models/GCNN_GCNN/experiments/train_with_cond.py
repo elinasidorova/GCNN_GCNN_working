@@ -19,7 +19,7 @@ from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer
 from Source.models.GCNN_GCNN.featurizers import DglMetalFeaturizer, featurize_df
 from Source.models.GCNN_GCNN.model import GCNNGCNN
-from Source.data import balanced_train_test_valid_split
+from Source.data import balanced_train_valid_split
 from Source.models.global_poolings import ConcatPooling
 from config import ROOT_DIR
 
@@ -106,10 +106,10 @@ train_datasets = [featurize_df(df=pd.read_csv(train_csv_folder / f"{metal}.csv")
                                metal_featurizer=DGLFeaturizer(add_self_loop=False,
                                                               node_featurizer=DglMetalFeaturizer()))
                   for metal in all_metals if metal != test_metal]
-folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
-                                        batch_size=batch_size,
-                                        shuffle_every_epoch=True,
-                                        seed=seed)
+folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
+                                   batch_size=batch_size,
+                                   shuffle_every_epoch=True,
+                                   seed=seed)
 
 test_loader = DataLoader(featurize_df(
     df=pd.read_csv(test_csv),

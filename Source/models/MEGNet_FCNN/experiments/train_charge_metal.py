@@ -16,7 +16,7 @@ from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer
 from Source.models.MEGNet_FCNN.featurizers import featurize_sdf_with_metal_and_conditions
 from Source.models.MEGNet_FCNN.model import MEGNetFCNN
 from Source.models.global_poolings import ConcatPooling
-from Source.data import balanced_train_test_valid_split
+from Source.data import balanced_train_valid_split
 from config import ROOT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -137,10 +137,10 @@ train_datasets = [
         z_in_metal=z_in_metal,
     ) for metal in all_metals if metal != test_metal
 ]
-folds = balanced_train_test_valid_split(train_datasets, n_folds=cv_folds,
-                                        batch_size=batch_size,
-                                        shuffle_every_epoch=True,
-                                        seed=seed)
+folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
+                                   batch_size=batch_size,
+                                   shuffle_every_epoch=True,
+                                   seed=seed)
 test_loader = DataLoader(
     featurize_sdf_with_metal_and_conditions(
         path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
