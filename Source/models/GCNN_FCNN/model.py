@@ -100,13 +100,13 @@ class GCNN_FCNN(LightningModule):
 
     def training_step(self, train_batch, *args, **kwargs):
         logits = self.forward(train_batch)
-        loss = self.loss(train_batch.y, logits.reshape(*train_batch.y.shape))
+        loss = self.loss(logits, train_batch.y)
         self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
         logits = self.forward(val_batch)
-        loss = self.loss(val_batch.y, logits.reshape(*val_batch.y.shape))
+        loss = self.loss(logits, val_batch.y)
         self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
         return loss
 

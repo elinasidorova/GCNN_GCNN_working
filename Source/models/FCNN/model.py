@@ -87,13 +87,13 @@ class FCNN(LightningModule):
 
     def training_step(self, train_batch, *args, **kwargs):
         x, y = train_batch
-        loss = self.loss(y, self.forward(x).reshape(*y.shape))
+        loss = self.loss(self.forward(x), y)
         self.log('train_loss', loss, prog_bar=True)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
         x, y = val_batch
-        loss = self.loss(y, self.forward(x).reshape(*y.shape))
+        loss = self.loss(self.forward(x), y)
         self.log('val_loss', loss)
         return loss
 
