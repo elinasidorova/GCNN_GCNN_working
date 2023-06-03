@@ -125,7 +125,7 @@ class MolGraphHeteroNet(LightningModule):
 
         assert mode in ["regression",
                         "binary_classification",
-                        "multy_classification"], "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed"
+                        "multiclass_classification"], "Invalid mode value, only 'regression', 'binary_classification' or 'multiclass_classification' are allowed"
 
         self.config = {
             "node_features": node_features,
@@ -204,7 +204,7 @@ class MolGraphHeteroNet(LightningModule):
 
         self.loss = {"regression": self.mse_loss,
                      "binary_classification": self.bce_loss,
-                     "multy_classification": self.cross_entropy_loss}[self.mode]
+                     "multiclass_classification": self.cross_entropy_loss}[self.mode]
 
         self.pre_metal_sequential = self.make_lin_blocks(hidden_dims=self.hidden_metal,
                                                          actf=self.metal_actf,

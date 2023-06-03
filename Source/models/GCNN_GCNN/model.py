@@ -65,14 +65,14 @@ class GCNNGCNN(LightningModule):
                     nn.Linear((self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1], num_targets),
                     nn.Sigmoid())
                 self.loss = F.binary_cross_entropy
-            elif self.mode == "multy_classification":
+            elif self.mode == "multiclass_classification":
                 self.out_sequential = nn.Sequential(
                     nn.Linear((self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1], num_targets),
                     nn.Softmax())
                 self.loss = F.cross_entropy
             else:
                 raise ValueError(
-                    "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed")
+                    "Invalid mode value, only 'regression', 'binary_classification' or 'multiclass_classification' are allowed")
         else:
             self.output_dim = self.post_fc_sequential.output_dim
 

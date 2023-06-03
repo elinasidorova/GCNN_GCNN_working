@@ -45,12 +45,12 @@ class FCNN(LightningModule):
             elif self.mode == "binary_classification":
                 self.out_sequential = nn.Sequential(nn.Linear((input_features, *hidden)[-1], num_targets), nn.Sigmoid())
                 self.loss = F.binary_cross_entropy
-            elif self.mode == "multy_classification":
+            elif self.mode == "multiclass_classification":
                 self.out_sequential = nn.Sequential(nn.Linear((input_features, *hidden)[-1], num_targets), nn.Softmax())
                 self.loss = F.cross_entropy
             else:
                 raise ValueError(
-                    "Invalid mode value, only 'regression', 'binary_classification' or 'multy_classification' are allowed")
+                    "Invalid mode value, only 'regression', 'binary_classification' or 'multiclass_classification' are allowed")
         else:
             self.out_sequential = nn.Sequential()
             self.output_dim = (input_features, *hidden)[-1]
