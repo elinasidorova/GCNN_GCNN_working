@@ -1,46 +1,34 @@
-import json
 import warnings
 from inspect import signature
 
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim.optimizer
-from pytorch_lightning import LightningModule
-from torch import sqrt
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.data import Data
 
 from Source.models.FCNN.model import FCNN
 from Source.models.GCNN.model import GCNN
+from Source.models.base_model import BaseModel
 from Source.models.global_poolings import ConcatPooling
 
 
-class GCNNGCNN(LightningModule):
-    def __init__(self, metal_node_features, mol_node_features, num_targets,
+class GCNNGCNN(BaseModel):
+    def __init__(self, metal_node_features, mol_node_features, targets,
                  mol_gcnn_params=None, metal_gcnn_params=None, global_pooling=ConcatPooling, post_fc_params=None,
                  use_out_sequential=True,
-                 optimizer=torch.optim.Adam, optimizer_parameters=None, mode="regression"):
-        super(GCNNGCNN, self).__init__()
+                 optimizer=torch.optim.Adam, optimizer_parameters=None):
+        super(GCNNGCNN, self).__init__(targets, use_out_sequential, optimizer, optimizer_parameters)
         param_values = locals()
         self.config = {name: param_values[name] for name in signature(self.__init__).parameters.keys()}
 
-        self.num_targets = num_targets
-        self.use_out_sequential = use_out_sequential
-
-        self.optimizer = optimizer
-        self.optimizer_parameters = optimizer_parameters or {}
-        self.mode = mode
-
         # preparing params for model blocks
         for p in [mol_gcnn_params, metal_gcnn_params, post_fc_params]:
-            if "num_targets" in p:
+            if "targets" in p and len(p["targets"]) > 0:
                 warnings.warn(
-                    "Not recommended to set 'num_targets' in model blocks as far as it doesn't affect anything",
+                    "Not recommended to set 'targets' in model blocks as far as it doesn't affect anything",
                     DeprecationWarning)
             if "use_out_sequential" in p:
                 warnings.warn("'use_out_sequential' parameter forcibly set to False", DeprecationWarning)
             p["use_out_sequential"] = False
-            p["num_targets"] = 1
+            p["targets"] = ()
 
         mol_gcnn_params["input_features"] = mol_node_features
         metal_gcnn_params["node_features"] = metal_node_features
@@ -54,30 +42,8 @@ class GCNNGCNN(LightningModule):
 
         self.post_fc_sequential = FCNN(**post_fc_params)
 
-        if self.use_out_sequential:
-            self.output_dim = num_targets
-            if self.mode == "regression":
-                self.out_sequential = nn.Sequential(
-                    nn.Linear((self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1], num_targets))
-                self.loss = lambda *args, **kwargs: sqrt(F.mse_loss(*args, **kwargs))
-            elif self.mode == "binary_classification":
-                self.out_sequential = nn.Sequential(
-                    nn.Linear((self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1], num_targets),
-                    nn.Sigmoid())
-                self.loss = F.binary_cross_entropy
-            elif self.mode == "multiclass_classification":
-                self.out_sequential = nn.Sequential(
-                    nn.Linear((self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1], num_targets),
-                    nn.Softmax())
-                self.loss = F.cross_entropy
-            else:
-                raise ValueError(
-                    "Invalid mode value, only 'regression', 'binary_classification' or 'multiclass_classification' are allowed")
-        else:
-            self.output_dim = self.post_fc_sequential.output_dim
-
-        self.valid_losses = []
-        self.train_losses = []
+        self.last_common_dim = (self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1]
+        self.configure_out_layer()
 
     def forward(self, graph):
         mol_graph = Data(x=graph.x_mol, edge_index=graph.edge_index_mol,
@@ -91,38 +57,5 @@ class GCNNGCNN(LightningModule):
         general = self.global_pooling(mol_x, metal_x)
         general = self.post_fc_sequential(general)
         if self.use_out_sequential:
-            general = self.out_sequential(general)
+            general = {target: sequential(general) for target, sequential in self.out_sequentials.items()}
         return general
-
-    def configure_optimizers(self):
-        optimizer = self.optimizer(self.parameters(), **self.optimizer_parameters)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": ReduceLROnPlateau(optimizer, factor=0.2, patience=20, verbose=True),
-                "monitor": "val_loss",
-                "frequency": 1  # should be set to "trainer.check_val_every_n_epoch"
-            },
-        }
-
-    def training_step(self, train_batch, *args, **kwargs):
-        loss = self.loss(self.forward(train_batch), train_batch.y)
-        self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
-        return loss
-
-    def validation_step(self, val_batch, *args, **kwargs):
-        loss = self.loss(self.forward(val_batch), val_batch.y)
-        self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
-        return loss
-
-    def get_model_structure(self):
-        def make_jsonable(x):
-            try:
-                json.dumps(x)
-                return x
-            except (TypeError, OverflowError):
-                if isinstance(x, dict):
-                    return {key: make_jsonable(value) for key, value in x.items()}
-                return str(x)
-
-        return make_jsonable(self.config)

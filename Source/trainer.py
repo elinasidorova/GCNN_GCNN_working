@@ -36,7 +36,7 @@ class ModelShell(nn.Module):
 class ModelTrainer:
     def __init__(self, model, train_valid_data, test_data=None, output_folder=None,
                  es_patience=20, epochs=1000, save_to_folder=True, seed=42,
-                 target_metrics=None):
+                 targets=()):
         pytorch_lightning.seed_everything(seed)
         torch_geometric.seed_everything(seed)
         self.initial_model = model
@@ -45,7 +45,7 @@ class ModelTrainer:
         self.test_data = test_data
         self.es_patience = es_patience
         self.epochs = epochs
-        self.target_metrics = target_metrics or {}
+        self.targets = targets
         self.save_to_folder = save_to_folder
         self.results_dict = {}
 
@@ -86,14 +86,16 @@ class ModelTrainer:
 
         results_dict = {}
 
-        for i, target_name in enumerate(self.target_metrics):
-            for metric_name in self.target_metrics[target_name]:
-                for phase, true, pred in zip(phase_names, true_values, pred_values):
-                    metric, params = self.target_metrics[target_name][metric_name]
-                    mask = ~np.isnan(true[:, i])
-                    if not mask.any(): continue
-                    results_dict[f"{target_name}_{phase}_{metric_name}"] = float(
-                        metric(true[:, i][mask], pred[:, i][mask], **params))
+        for target in self.targets:
+            for phase, true, pred in zip(phase_names, true_values, pred_values):
+                local_true = true[target["name"]]
+                local_pred = pred[target["name"]]
+                mask = ~np.isnan(local_true)
+                for metric_name in target["metrics"]:
+                    metric, params = target["metrics"][metric_name]
+                    key = f"{target['name']}_{phase}_{metric_name}"
+                    res = metric(local_true[mask], local_pred[mask], **params)
+                    results_dict[key] = float(res) if np.prod(res.shape) == 1 else res.tolist()
 
         return results_dict
 

@@ -9,9 +9,10 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
+from tqdm import tqdm
 
 sys.path.append(os.path.abspath("."))
-from Source.data import balanced_train_valid_split
+from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
@@ -21,6 +22,7 @@ from config import ROOT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
+
 
 all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 'Ce', 'Cf', 'Cm', 'Co', 'Cr', 'Cs',
               'Cu', 'Dy', 'Er', 'Eu', 'Fe', 'Ga', 'Gd', 'Hf', 'Hg', 'Ho', 'In', 'K', 'La', 'Li', 'Lu', 'Mg', 'Mn', 'Mo',
@@ -37,15 +39,17 @@ mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
 output_folder = ROOT_DIR / f"Output/WithCondAdd/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
 
-max_data = None
-targets = ("logK",)
-target_metrics = {
-    target: {
-        "R2": (r2_score, {}),
-        "RMSE": (lambda *args, **kwargs: np.sqrt(mean_squared_error(*args, **kwargs)), {}),
-        "MAE": (mean_absolute_error, {})
-    } for target in targets
-}
+targets = ({
+               "name": "logK",
+               "mode": "regression",
+               "dim": 1,
+               "metrics": {
+                   "R2": (r2_score, {}),
+                   "RMSE": (root_mean_squared_error, {}),
+                   "MAE": (mean_absolute_error, {})
+               },
+               "loss": nn.MSELoss(),
+           },)
 model_parameters = {
     "metal_fc_params": {
         "hidden": (256, 128, 128, 64, 64,),
@@ -81,11 +85,11 @@ model_parameters = {
     "global_pooling": MaxPooling,
 }
 
-logging.info("Featurizig...")
 train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
                                                           mol_featurizer=ConvMolFeaturizer(),
                                                           metal_featurizer=SkipatomFeaturizer())
-                  for metal in all_metals if metal != test_metal]
+                  for metal in tqdm(all_metals, desc="Featurizig") if metal != test_metal]
+logging.info("Splitting...")
 folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
                                    batch_size=batch_size,
                                    shuffle_every_epoch=True,
@@ -100,11 +104,10 @@ test_loader = DataLoader(featurize_sdf_with_metal_and_conditions(
 model = GCNN_FCNN(
     metal_features=next(iter(test_loader)).metal_x.shape[-1],
     node_features=next(iter(test_loader)).x.shape[-1],
-    num_targets=len(targets),
+    targets=targets,
     **model_parameters,
     optimizer=torch.optim.Adam,
     optimizer_parameters=None,
-    mode="regression",
 )
 
 trainer = GCNNTrainer(
@@ -114,7 +117,7 @@ trainer = GCNNTrainer(
     output_folder=output_folder,
     epochs=epochs,
     es_patience=es_patience,
-    target_metrics=target_metrics,
+    targets=targets,
     seed=seed,
 )
 

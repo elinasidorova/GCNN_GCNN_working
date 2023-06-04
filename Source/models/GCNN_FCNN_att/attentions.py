@@ -25,12 +25,12 @@ class GlobalAddAttention(BaseAttention):
         attention_parameters = attention_parameters or {"num_heads": 1}
 
         for p in [key_fc_params, query_fc_params]:
-            if "num_targets" in p:
-                warnings.warn("'num_targets' doesn't affect anything", DeprecationWarning)
+            if "targets" in p and len(p["targets"]):
+                warnings.warn("'targets' doesn't affect anything", DeprecationWarning)
             if "use_out_sequential" in p:
                 warnings.warn("'use_out_sequential' parameter forcibly set to False", DeprecationWarning)
             p["use_out_sequential"] = False
-            p["num_targets"] = 1
+            p["targets"] = ()
 
         self.key_sequential = FCNN(**key_fc_params)
         self.query_sequential = FCNN(**query_fc_params)

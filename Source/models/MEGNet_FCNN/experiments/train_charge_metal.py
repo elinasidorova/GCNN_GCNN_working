@@ -16,7 +16,7 @@ from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer
 from Source.models.MEGNet_FCNN.featurizers import featurize_sdf_with_metal_and_conditions
 from Source.models.MEGNet_FCNN.model import MEGNetFCNN
 from Source.models.global_poolings import ConcatPooling
-from Source.data import balanced_train_valid_split
+from Source.data import balanced_train_valid_split, root_mean_squared_error
 from config import ROOT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -41,14 +41,17 @@ mol_featurizer = DGLFeaturizer(add_self_loop=False,
                                node_featurizer=CanonicalAtomFeaturizer(),
                                edge_featurizer=CanonicalBondFeaturizer())
 z_in_metal = True
-targets = ("logK",)
-target_metrics = {
-    target: {
-        "R2": (r2_score, {}),
-        "RMSE": (lambda *args, **kwargs: np.sqrt(mean_squared_error(*args, **kwargs)), {}),
-        "MAE": (mean_absolute_error, {})
-    } for target in targets
-}
+targets = ({
+               "name": "logK",
+               "mode": "regression",
+               "dim": 1,
+               "metrics": {
+                   "R2": (r2_score, {}),
+                   "RMSE": (root_mean_squared_error, {}),
+                   "MAE": (mean_absolute_error, {})
+               },
+               "loss": nn.MSELoss(),
+           },)
 model_parameters = {
     "metal_fc_params": {
         "hidden": (256, 128,),
@@ -154,11 +157,10 @@ model = MEGNetFCNN(
     edge_features=next(iter(test_loader)).edge_attr.shape[-1],
     node_features=next(iter(test_loader)).x.shape[-1],
     global_features=next(iter(test_loader)).u.shape[-1],
-    num_targets=len(targets),
+    targets=targets,
     **model_parameters,
     optimizer=torch.optim.Adam,
     optimizer_parameters=None,
-    mode="regression",
 )
 
 trainer = GCNNTrainer(
@@ -168,7 +170,7 @@ trainer = GCNNTrainer(
     output_folder=output_folder,
     epochs=epochs,
     es_patience=es_patience,
-    target_metrics=target_metrics,
+    targets=targets,
     seed=seed,
 )
 

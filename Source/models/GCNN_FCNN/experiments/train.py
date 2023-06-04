@@ -105,7 +105,7 @@ test_loader = DataLoader(featurize_sdf_with_metal(
 model = GCNN_FCNN(
     metal_features=next(iter(test_loader)).metal_x.shape[-1],
     node_features=next(iter(test_loader)).x.shape[-1],
-    num_targets=len(targets),
+    targets=len(targets),
     **model_parameters,
     optimizer=torch.optim.Adam,
     optimizer_parameters=None,

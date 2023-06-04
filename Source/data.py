@@ -1,7 +1,13 @@
 import random
 
+import numpy as np
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold, train_test_split
 from torch_geometric.loader import DataLoader
+
+
+def root_mean_squared_error(*args, **kwargs):
+    return np.sqrt(mean_squared_error(*args, **kwargs))
 
 
 def balanced_train_valid_split(datasets, n_folds, batch_size, shuffle_every_epoch, valid_size=None, seed=17):
@@ -13,7 +19,8 @@ def balanced_train_valid_split(datasets, n_folds, batch_size, shuffle_every_epoc
             if len(mol_ids) < 2:
                 train[0] += [val for i, val in enumerate(dataset) if i in mol_ids]
             else:
-                train_index, valid_index = train_test_split(mol_ids, test_size=valid_size, random_state=seed, shuffle=False)
+                train_index, valid_index = train_test_split(mol_ids, test_size=valid_size, random_state=seed,
+                                                            shuffle=False)
                 train[0] += [val for i, val in enumerate(dataset) if i in train_index]
                 val[0] += [val for i, val in enumerate(dataset) if i in valid_index]
 

@@ -19,7 +19,7 @@ from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer
 from Source.models.GCNN_GCNN.featurizers import DglMetalFeaturizer, featurize_df
 from Source.models.GCNN_GCNN.model import GCNNGCNN
-from Source.data import balanced_train_valid_split
+from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.global_poolings import ConcatPooling
 from config import ROOT_DIR
 
@@ -36,15 +36,17 @@ output_folder = ROOT_DIR / f"Output/Check_U_1fold_{mode}_{time_mark}"
 train_csv_folder = ROOT_DIR / "Data/OneM_cond"
 test_csv = ""
 
-max_data = None
-targets = ("logK",)
-target_metrics = {
-    target: {
-        "R2": (r2_score, {}),
-        "RMSE": (lambda *args, **kwargs: np.sqrt(mean_squared_error(*args, **kwargs)), {}),
-        "MAE": (mean_absolute_error, {})
-    } for target in targets
-}
+targets = ({
+               "name": "logK",
+               "mode": "regression",
+               "dim": 1,
+               "metrics": {
+                   "R2": (r2_score, {}),
+                   "RMSE": (root_mean_squared_error, {}),
+                   "MAE": (mean_absolute_error, {})
+               },
+               "loss": nn.MSELoss(),
+           },)
 model_parameters = {
     "mol_gcnn_params": {
         "pre_fc_params": {
@@ -121,11 +123,10 @@ test_loader = DataLoader(featurize_df(
 model = GCNNGCNN(
     metal_node_features=next(iter(test_loader)).x_metal.shape[-1],
     mol_node_features=next(iter(test_loader)).x_mol.shape[-1],
-    num_targets=len(targets),
+    targets=targets,
     **model_parameters,
     optimizer=torch.optim.Adam,
     optimizer_parameters=None,
-    mode="regression",
 )
 
 trainer = GCNNTrainer(
@@ -135,7 +136,7 @@ trainer = GCNNTrainer(
     output_folder=output_folder,
     epochs=epochs,
     es_patience=es_patience,
-    target_metrics=target_metrics,
+    targets=targets,
     seed=seed,
 )
 
