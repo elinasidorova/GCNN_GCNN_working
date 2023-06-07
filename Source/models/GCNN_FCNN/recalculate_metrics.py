@@ -4,7 +4,9 @@ import sys
 
 import numpy as np
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from torch import nn
 from torch_geometric.loader import DataLoader
+from tqdm import tqdm
 
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from config import ROOT_DIR
@@ -14,42 +16,45 @@ sys.path.append(os.path.abspath("."))
 from model import GCNN_FCNN
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.trainer import ModelShell
-from Source.data import balanced_train_valid_split
+from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 cv_folds = 5
-seed = 27
-batch_size = 32
+seed = 23
+batch_size = 64
 epochs = 1000
 es_patience = 100
-train_sdf_folder = ROOT_DIR / "Data/OneM_cond"
-train_folder = ROOT_DIR / "Output/WithCond/La_1fold_regression_2023_05_14_13_34_39"
+train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
+train_folder = ROOT_DIR / "Output/WithCondAdd/5fold/Ac_5fold_regression_2023_05_30_21_09_41"
 
-targets = ("logK",)
-target_metrics = {
-    target: {
-        "R2": (r2_score, {}),
-        "RMSE": (lambda *args, **kwargs: np.sqrt(mean_squared_error(*args, **kwargs)), {}),
-        "MAE": (mean_absolute_error, {})
-    } for target in targets
-}
+targets = ({
+               "name": "logK",
+               "mode": "regression",
+               "dim": 1,
+               "metrics": {
+                   "R2": (r2_score, {}),
+                   "RMSE": (root_mean_squared_error, {}),
+                   "MAE": (mean_absolute_error, {})
+               },
+               "loss": nn.MSELoss(),
+           },)
 
-test_metal = "La"
+test_metal = "Ac"
 
-all_metals = ['Ac', 'Ag', 'Al', 'Am', 'Au', 'Ba', 'Be', 'Bi', 'Bk', 'Ca', 'Cd', 'Ce', 'Cf', 'Cm', 'Co', 'Cr', 'Cs',
-              'Cu', 'Dy', 'Er', 'Eu', 'Fe', 'Ga', 'Gd', 'Hf', 'Hg', 'Ho', 'In', 'K', 'La', 'Li', 'Lu', 'Mg', 'Mn', 'Mo',
-              'Na', 'Nd', 'Ni', 'Np', 'Pa', 'Pb', 'Pd', 'Pm', 'Pr', 'Pt', 'Pu', 'Rb', 'Re', 'Rh', 'Sb', 'Sc', 'Sm',
-              'Sn', 'Sr', 'Tb', 'Th', 'Ti', 'Tl', 'Tm', 'U', 'V', 'Y', 'Yb', 'Zn', 'Zr']
+all_metals = ['Co', 'In', 'Zn', 'Tm', 'Mo', 'La', 'Al', 'Cd', 'Lu', 'Tb', 'Pa', 'Cs', 'Ni', 'Ho', 'Ti', 'Zr', 'Pd',
+              'Gd', 'Cr', 'Am', 'Y', 'Eu', 'Pu', 'Hg', 'Pr', 'Au', 'Hf', 'Rh', 'Np', 'Cf', 'Mn', 'Pt', 'Li', 'Sc', 'Nd',
+              'Bk', 'Ca', 'Tl', 'Re', 'Na', 'Bi', 'Be', 'Er', 'Cu', 'Ac', 'Pb', 'Th', 'Pm', 'Sr', 'U', 'Sn', 'Ag', 'Rb',
+              'Dy', 'Ce', 'V', 'Yb', 'Ga', 'Sm', 'Mg', 'Fe', 'Cm', 'Sb', 'K', 'Ba']
 
 super_model = ModelShell(GCNN_FCNN, train_folder)
 
-logging.info("Featurizig...")
 train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
                                                           mol_featurizer=ConvMolFeaturizer(),
                                                           metal_featurizer=SkipatomFeaturizer())
-                  for metal in all_metals if metal != test_metal]
+                  for metal in tqdm(all_metals, desc="Featurizig") if metal != test_metal]
+logging.info("Splitting...")
 folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
                                    batch_size=batch_size,
                                    shuffle_every_epoch=True,
@@ -65,7 +70,7 @@ trainer = GCNNTrainer(
     model=None,
     train_valid_data=folds,
     test_data=test_loader,
-    target_metrics=target_metrics,
+    targets=targets,
     seed=seed,
 )
 trainer.models = super_model.models

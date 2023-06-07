@@ -1,17 +1,11 @@
-import copy
-import random
-
 import numpy as np
 import torch
-from loguru import logger
 from rdkit import Chem
 from rdkit.Chem import (
     AllChem, DataStructs
 )
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
-
-from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer
 
 
 class VecData(Dataset):

@@ -16,6 +16,7 @@ class ModelShell(nn.Module):
     def __init__(self, model_class, train_folder, device=torch.device("cpu")):
         super().__init__()
         self.models = []
+        self.device = device
         path_to_config = os.path.join(train_folder, "model_config.torch")
         model = model_class(**torch.load(path_to_config))
         for folder_name in os.listdir(train_folder):
@@ -25,12 +26,18 @@ class ModelShell(nn.Module):
                 new_model = copy.deepcopy(model)
                 new_model.load_state_dict(state_dict)
                 new_model.eval()
-                new_model.to(device)
+                new_model.to(self.device)
                 self.models += [new_model]
 
     def forward(self, *args, **kwargs):
-        outs = torch.cat([model(*args, **kwargs).unsqueeze(-1) for model in self.models], dim=-1)
-        return outs.mean(dim=-1)
+        all_pred = [model(*args, **kwargs) for model in self.models]
+        output = {
+            target_name: torch.cat([
+                pred[target_name].unsqueeze(-1) for pred in all_pred
+            ], dim=-1).mean(dim=-1)
+            for target_name in all_pred[0].keys()
+        }
+        return output
 
 
 class ModelTrainer:
@@ -87,11 +94,12 @@ class ModelTrainer:
         results_dict = {}
 
         for target in self.targets:
-            for phase, true, pred in zip(phase_names, true_values, pred_values):
-                local_true = true[target["name"]]
-                local_pred = pred[target["name"]]
-                mask = ~np.isnan(local_true)
-                for metric_name in target["metrics"]:
+            for metric_name in target["metrics"]:
+                for phase, true, pred in zip(phase_names, true_values, pred_values):
+                    local_true = true[target["name"]]
+                    local_pred = pred[target["name"]]
+                    mask = ~np.isnan(local_true)
+
                     metric, params = target["metrics"][metric_name]
                     key = f"{target['name']}_{phase}_{metric_name}"
                     res = metric(local_true[mask], local_pred[mask], **params)

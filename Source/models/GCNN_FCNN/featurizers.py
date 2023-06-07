@@ -9,6 +9,7 @@ from dgllife.utils import mol_to_bigraph
 from rdkit import Chem
 from torch_geometric.utils import from_networkx
 
+from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from config import ROOT_DIR
 
 
@@ -76,7 +77,8 @@ class SkipatomFeaturizer:
         return torch.tensor(self.get_vector[element]).unsqueeze(0)
 
 
-def featurize_sdf_with_metal(path_to_sdf, mol_featurizer, metal_featurizer, seed=42):
+def featurize_sdf_with_metal(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(), metal_featurizer=SkipatomFeaturizer(),
+                             seed=42):
     """
     Extract molecules from .sdf file and featurize them
 
@@ -96,7 +98,11 @@ def featurize_sdf_with_metal(path_to_sdf, mol_featurizer, metal_featurizer, seed
     features : list of torch_geometric.data objects
         list of graphs corresponding to individual molecules from .sdf file
     """
-    mols = [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
+    if path_to_sdf is None and molecules is None:
+        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
+    elif path_to_sdf is not None and molecules is not None:
+        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
+    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
     mol_graphs = [mol_featurizer.featurize(m) for m in mols]
 
     all_data = []
@@ -114,7 +120,8 @@ def featurize_sdf_with_metal(path_to_sdf, mol_featurizer, metal_featurizer, seed
     return all_data
 
 
-def featurize_sdf_with_metal_and_conditions(path_to_sdf, mol_featurizer, metal_featurizer, seed=42):
+def featurize_sdf_with_metal_and_conditions(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
+                                            metal_featurizer=SkipatomFeaturizer(), seed=42, shuffle=True):
     """
     Extract molecules from .sdf file and featurize them
 
@@ -136,7 +143,11 @@ def featurize_sdf_with_metal_and_conditions(path_to_sdf, mol_featurizer, metal_f
     features : list of torch_geometric.data objects
         list of graphs corresponding to individual molecules from .sdf file
     """
-    mols = [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
+    if path_to_sdf is None and molecules is None:
+        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
+    elif path_to_sdf is not None and molecules is not None:
+        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
+    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
     mol_features = [mol_featurizer.featurize(m) for m in mols]
 
     all_data = []
@@ -157,6 +168,7 @@ def featurize_sdf_with_metal_and_conditions(path_to_sdf, mol_featurizer, metal_f
             features.metal_x = torch.cat((metal_featurizer.featurize(element_symbol), condition_values), dim=-1)
             features.y = {"logK": torch.tensor([[logK]])}
             all_data += [features]
-    random.Random(seed).shuffle(all_data)
+
+    if shuffle: random.Random(seed).shuffle(all_data)
 
     return all_data
