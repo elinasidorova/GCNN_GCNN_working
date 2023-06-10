@@ -32,13 +32,13 @@ class GCNNTrainer(ModelTrainer):
 
         train, val = self.train_valid_data[0]
         train_batch = Batch.from_data_list(train.dataset + val.dataset)
-        test_batch = Batch.from_data_list(self.test_data.dataset)
+        test_batch = Batch.from_data_list(self.test_data.dataset) if self.test_data else None
 
         train_pred = prepare(get_mean_pred(train_batch))
         train_true = {k: v.numpy() for k, v in train_batch.y.items()}
 
-        test_pred = prepare(get_mean_pred(test_batch))
-        test_true = {k: v.numpy() for k, v in test_batch.y.items()}
+        test_pred = prepare(get_mean_pred(test_batch)) if self.test_data else None
+        test_true = {k: v.numpy() for k, v in test_batch.y.items()} if self.test_data else None
 
         valid_batches = [Batch.from_data_list(self.train_valid_data[i][1].dataset) for i in range(len(self.models))]
         valid_preds = [model(batch) for model, batch in zip(self.models, valid_batches)]

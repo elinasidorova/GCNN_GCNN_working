@@ -87,9 +87,9 @@ class ModelTrainer:
     def calculate_metrics(self):
         train_true, valid_true, test_true, train_pred, valid_pred, test_pred = self.get_true_pred()
 
-        phase_names = ("train", "valid", "test")
-        true_values = (train_true, valid_true, test_true)
-        pred_values = (train_pred, valid_pred, test_pred)
+        phase_names = ("train", "valid", "test") if self.test_data else ("train", "valid")
+        true_values = (train_true, valid_true, test_true) if self.test_data else (train_true, valid_true)
+        pred_values = (train_pred, valid_pred, test_pred) if self.test_data else (train_pred, valid_pred)
 
         results_dict = {}
 

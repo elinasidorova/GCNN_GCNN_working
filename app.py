@@ -8,7 +8,7 @@ from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.trainer import ModelShell
 from config import ROOT_DIR
 
-MODEL = ModelShell(GCNN_FCNN, str(ROOT_DIR / "App_models" / "Am"))
+MODEL = ModelShell(GCNN_FCNN, str(ROOT_DIR / "App_models" / "Y_Sc_f-elements_5fold_regression_2023_06_10_07_58_17"))
 AVAILABLE_METALS = ["Sc", "Y", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
                     "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", ]
 
