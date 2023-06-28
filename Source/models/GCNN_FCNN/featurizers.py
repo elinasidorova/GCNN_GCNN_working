@@ -200,4 +200,5 @@ class Complex:
         self.graph = self.mol_featurizer.featurize(self.mol)
         conditions = torch.tensor([[self.valence, self.temperature, self.ionic_str]])
         self.graph.metal_x = torch.cat((self.metal_featurizer.featurize(self.metal), conditions), dim=-1)
-        if self.logk: self.graph.y = torch.tensor([self.logk])
+        if self.logk:
+            self.graph.y = torch.tensor([self.logk])
