@@ -13,7 +13,7 @@ METAL = "Cm"
 VALENCE = 3
 TEMPERATURE = 25
 IONIC_STR = 0.1
-MODEL = ModelShell(GCNN_FCNN, ROOT_DIR / "App_models/Cm")
+MODEL = ModelShell(GCNN_FCNN, ROOT_DIR / "App_models/Y_Sc_f-elements_5fold_regression_2023_06_10_07_58_17")
 
 
 def fitness_function(smi: str) -> float:
@@ -42,7 +42,7 @@ params_dict = {
 
     # The number of molecules for which fitness calculations are done,
     # exploration and exploitation each have their own population
-    "generation_size": 5000,
+    "generation_size": 500,
 
     # Number of molecules that are exchanged between the exploration and exploitation
     "num_exchanges": 5,
@@ -58,17 +58,17 @@ params_dict = {
 }
 
 # Set your SELFIES constraints (below used for manuscript)
-default_constraints = selfies.get_semantic_constraints()
-new_constraints = default_constraints
-new_constraints['S'] = 2
-new_constraints['P'] = 3
-selfies.set_semantic_constraints(new_constraints)  # update constraints
+# default_constraints = selfies.get_semantic_constraints()
+# new_constraints = default_constraints
+# new_constraints['S'] = 2
+# new_constraints['P'] = 3
+# selfies.set_semantic_constraints(new_constraints)  # update constraints
 
 # Create JANUS object.
 agent = JANUS(
     work_dir='RESULTS',  # where the results are saved
     fitness_function=fitness_function,  # user-defined fitness for given smiles
-    start_population="Data/sample_start_smiles.txt",  # file with starting smiles population
+    start_population="Data/simple_random_smiles.txt",  # file with starting smiles population
     **params_dict
 )
 
