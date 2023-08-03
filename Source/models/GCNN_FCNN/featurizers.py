@@ -180,13 +180,14 @@ def featurize_sdf_with_metal_and_conditions(path_to_sdf=None, molecules=None, mo
 class Complex:
     def __init__(self, mol: Union[str, Mol], metal: str,
                  valence: int, temperature: float, ionic_str: float,
-                 logk: Optional[float] = None):
+                 logk: Optional[float] = None, use_conds=True):
 
         self.metal = metal
         self.valence = valence if valence else 3
         self.temperature = temperature if temperature else 20
         self.ionic_str = ionic_str if ionic_str else 0.1
         self.logk = logk
+        self.use_conds = use_conds
         if isinstance(mol, str):
             self.mol = Chem.MolFromSmiles(mol)
         elif isinstance(mol, Mol):
@@ -199,6 +200,10 @@ class Complex:
 
         self.graph = self.mol_featurizer.featurize(self.mol)
         conditions = torch.tensor([[self.valence, self.temperature, self.ionic_str]])
-        self.graph.metal_x = torch.cat((self.metal_featurizer.featurize(self.metal), conditions), dim=-1)
+        if self.use_conds:
+            self.graph.metal_x = torch.cat((self.metal_featurizer.featurize(self.metal), conditions), dim=-1)
+        else:
+            self.graph.metal_x = self.metal_featurizer.featurize(self.metal)
+
         if self.logk:
             self.graph.y = torch.tensor([self.logk])

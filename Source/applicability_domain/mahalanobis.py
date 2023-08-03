@@ -1,3 +1,6 @@
+import os
+import pickle
+
 import numpy as np
 from scipy import sparse
 from sklearn import model_selection
@@ -5,11 +8,19 @@ from sklearn.neighbors import KernelDensity
 
 
 class MahalanobisAD:
-    def __init__(self, x_train):
+    def __init__(self, x_train, out_path):
         self.x_train = np.asarray(x_train)
-
+        self.out_path = out_path
         self.estimate_density(scale=None)
         self.estimate_distance()
+
+        if os.path.exists(self.out_path):
+            with open(os.path.join(self.out_path, "density_model.pkl")) as f:
+                self.density_model = pickle.load(f)
+            self.density_mean = np.load(os.path.join(self.out_path, "density_mean.npy"))
+            self.density_std = np.load(os.path.join(self.out_path, "density_std.npy"))
+            self.distance_mean = np.load(os.path.join(self.out_path, "distance_mean.npy"))
+            self.distance_std = np.load(os.path.join(self.out_path, "distance_std.npy"))
 
     def get_distance(self, input_vector):
         """
@@ -47,6 +58,11 @@ class MahalanobisAD:
         self.density_mean = np.mean(samples)
         self.density_std = np.std(samples)
 
+        with open(os.path.join(self.out_path, "density_model.pkl"), "w") as f:
+            pickle.dump(self.density_model, f)
+        np.save(os.path.join(self.out_path, "density_mean.npy"), self.density_mean)
+        np.save(os.path.join(self.out_path, "density_std.npy"), self.density_std)
+
     def estimate_distance(self):
         """
         Takes self.x_train dataframe,
@@ -60,6 +76,9 @@ class MahalanobisAD:
 
         self.distance_mean = np.mean(dist_list)
         self.distance_std = np.std(dist_list)
+
+        np.save(os.path.join(self.out_path, "distance_mean.npy"), self.distance_mean)
+        np.save(os.path.join(self.out_path, "distance_std.npy"), self.distance_std)
 
     def vect_in_ad(self, input_vector):
         """

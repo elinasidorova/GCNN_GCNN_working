@@ -48,7 +48,7 @@ params_dict = {
 
     # The number of molecules for which fitness calculations are done,
     # exploration and exploitation each have their own population
-    "generation_size": 5000,
+    "generation_size": 1000,
 
     # Number of molecules that are exchanged between the exploration and exploitation
     "num_exchanges": 5,
