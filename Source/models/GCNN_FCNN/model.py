@@ -43,11 +43,12 @@ class GCNN_FCNN(BaseModel):
         self.last_common_dim = (self.global_pooling.output_dim, self.post_fc_sequential.output_dim)[-1]
         self.configure_out_layer()
 
-    def forward(self, graph):
+    def forward(self, graph, return_latent=False):
         x = self.graph_sequential(graph)
         metal_x = self.metal_fc_sequential(graph.metal_x)
         general = self.global_pooling(x, metal_x)
-        general = self.post_fc_sequential(general)
+        last_latent = self.post_fc_sequential(general)
         if self.use_out_sequential:
-            general = {target: sequential(general) for target, sequential in self.out_sequentials.items()}
-        return general
+            general = {target: sequential(last_latent) for target, sequential in self.out_sequentials.items()}
+
+        return (general, last_latent) if return_latent else general
