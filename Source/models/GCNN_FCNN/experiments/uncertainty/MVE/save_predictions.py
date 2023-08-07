@@ -39,8 +39,8 @@ epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
-output_dir = ROOT_DIR / "Output/Uncertainty/MVE/"
-train_folder = ROOT_DIR / f"Output/Uncertainty_MVE/1fold_regression_2023_08_05_15_30_53"
+output_dir = ROOT_DIR / "Output/Uncertainty/MVE_AcTest/"
+train_folder = ROOT_DIR / f"Output/Uncertainty_MVE/AcTest_1fold_regression_2023_08_07_13_36_03"
 
 targets = ({
                "name": "logK",

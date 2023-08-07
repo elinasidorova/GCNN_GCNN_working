@@ -5,14 +5,15 @@ from datetime import datetime
 
 import torch
 from torch import nn
+from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 from tqdm import tqdm
 
+sys.path.append(os.path.abspath(""))
+
 from Source.models.GCNN_FCNN.experiments.uncertainty.MVE.metrics import r2_score_MVE, root_mean_squared_error_MVE, \
     mean_absolute_error_MVE, negative_log_likelihood
-
-sys.path.append(os.path.abspath(""))
-from Source.data import balanced_train_valid_test_split
+from Source.data import balanced_train_valid_split
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
@@ -29,7 +30,8 @@ other_metals = ['Li', 'Be', 'Na', 'Mg', 'Al', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 
 Ln_metals = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', ]
 Ac_metals = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
 
-train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa"})
+train_metals = list(set(["Y", "Sc"] + Ln_metals))
+test_metals = list(set(Ac_metals) - {"Ac", "Pa"})
 
 cv_folds = 1
 test_size = 0.1
@@ -39,7 +41,7 @@ epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
-output_folder = ROOT_DIR / f"Output/Uncertainty_MVE/{cv_folds}fold_{mode}_{time_mark}"
+output_folder = ROOT_DIR / f"Output/Uncertainty_MVE/AcTest_{cv_folds}fold_{mode}_{time_mark}"
 
 targets = ({
                "name": "logK",
@@ -93,11 +95,18 @@ train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.jo
                                                           metal_featurizer=SkipatomFeaturizer())
                   for metal in tqdm(train_metals, desc="Featurizig")]
 logging.info("Splitting...")
-folds, test_loader = balanced_train_valid_test_split(train_datasets, n_folds=cv_folds,
-                                                     batch_size=batch_size,
-                                                     test_size=test_size,
-                                                     shuffle_every_epoch=True,
-                                                     seed=seed)
+folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
+                                   batch_size=batch_size,
+                                   shuffle_every_epoch=True,
+                                   seed=seed)
+test_data = []
+for test_metal in test_metals:
+    test_data += featurize_sdf_with_metal_and_conditions(
+        path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
+        mol_featurizer=ConvMolFeaturizer(),
+        metal_featurizer=SkipatomFeaturizer())
+
+test_loader = DataLoader(test_data, batch_size=batch_size)
 
 model = GCNN_FCNN(
     metal_features=next(iter(test_loader)).metal_x.shape[-1],

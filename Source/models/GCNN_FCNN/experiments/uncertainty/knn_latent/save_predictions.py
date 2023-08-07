@@ -124,7 +124,7 @@ def distance(v1, v2):
 
 train_df = pd.read_json(output_dir / "train_latents.json")
 
-for name in ("valid", "test"):
+for name in ("train", "valid", "test"):
     data = []
     df = pd.read_json(output_dir / f"{name}_latents.json")
     for i in df.index:
