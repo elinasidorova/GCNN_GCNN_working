@@ -5,6 +5,7 @@ import sys
 import pandas as pd
 import torch
 from torch import nn
+from torch_geometric.loader import DataLoader
 from torch_geometric.nn import MFConv, global_mean_pool
 from tqdm import tqdm
 
@@ -18,7 +19,7 @@ from config import ROOT_DIR
 sys.path.append(os.path.abspath("."))
 
 from Source.trainer import ModelShell
-from Source.data import balanced_train_valid_test_split
+from Source.data import balanced_train_valid_split
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -29,7 +30,8 @@ other_metals = ['Li', 'Be', 'Na', 'Mg', 'Al', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 
 Ln_metals = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', ]
 Ac_metals = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
 
-train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa"})
+train_metals = list(set(["Y", "Sc"] + Ln_metals))
+test_metals = list(set(Ac_metals) - {"Ac", "Pa"})
 
 cv_folds = 1
 test_size = 0.1
@@ -93,11 +95,19 @@ train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.jo
                                                           metal_featurizer=SkipatomFeaturizer())
                   for metal in tqdm(train_metals, desc="Featurizig")]
 logging.info("Splitting...")
-folds, test_loader = balanced_train_valid_test_split(train_datasets, n_folds=cv_folds,
-                                                     batch_size=batch_size,
-                                                     test_size=test_size,
-                                                     shuffle_every_epoch=True,
-                                                     seed=seed)
+folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
+                                   batch_size=batch_size,
+                                   shuffle_every_epoch=True,
+                                   seed=seed)
+test_data = []
+for test_metal in test_metals:
+    test_data += featurize_sdf_with_metal_and_conditions(
+        path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
+        mol_featurizer=ConvMolFeaturizer(),
+        metal_featurizer=SkipatomFeaturizer())
+
+test_loader = DataLoader(test_data, batch_size=batch_size)
+
 train_loader, val_loader = folds[0]
 
 super_model = ModelShell(GCNN_FCNN, train_folder)
