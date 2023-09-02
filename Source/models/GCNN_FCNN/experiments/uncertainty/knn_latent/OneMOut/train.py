@@ -3,15 +3,15 @@ import os.path
 import sys
 from datetime import datetime
 
-import numpy as np
 import torch
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath("."))
+
 from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
@@ -34,14 +34,14 @@ Ac_metals = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
 train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa", test_metal})
 
 
-cv_folds = 5
+cv_folds = 1
 seed = 23
 batch_size = 64
 epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
-output_folder = ROOT_DIR / f"Output/OneM_cond/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
+output_folder = ROOT_DIR / f"Output/Uncertainty_knn_OneMOut/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
 
 targets = ({
                "name": "logK",
@@ -88,6 +88,7 @@ model_parameters = {
     },
     "global_pooling": MaxPooling,
 }
+
 
 train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
                                                           mol_featurizer=ConvMolFeaturizer(),

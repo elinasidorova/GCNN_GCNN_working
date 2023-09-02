@@ -3,16 +3,17 @@ import os.path
 import sys
 from datetime import datetime
 
-import numpy as np
 import torch
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath("."))
-from Source.data import balanced_train_valid_split, root_mean_squared_error
+
+from Source.models.GCNN_FCNN.experiments.uncertainty.MVE.metrics import r2_score_MVE, root_mean_squared_error_MVE, \
+    mean_absolute_error_MVE, negative_log_likelihood
+from Source.data import balanced_train_valid_split
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
@@ -34,26 +35,27 @@ Ac_metals = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
 train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa", test_metal})
 
 
-cv_folds = 5
+cv_folds = 1
 seed = 23
 batch_size = 64
 epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
-output_folder = ROOT_DIR / f"Output/OneM_cond/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
+output_folder = ROOT_DIR / f"Output/Uncertainty_MVE_OneMOut/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
 
 targets = ({
                "name": "logK",
                "mode": "regression",
-               "dim": 1,
+               "dim": 2,
                "metrics": {
-                   "R2": (r2_score, {}),
-                   "RMSE": (root_mean_squared_error, {}),
-                   "MAE": (mean_absolute_error, {})
+                   "R2": (r2_score_MVE, {}),
+                   "RMSE": (root_mean_squared_error_MVE, {}),
+                   "MAE": (mean_absolute_error_MVE, {})
                },
-               "loss": nn.MSELoss(),
+               "loss": negative_log_likelihood,
            },)
+
 model_parameters = {
     "metal_fc_params": {
         "hidden": (256, 128, 128, 64, 64,),
@@ -88,6 +90,7 @@ model_parameters = {
     },
     "global_pooling": MaxPooling,
 }
+
 
 train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.join(train_sdf_folder, f"{metal}.sdf"),
                                                           mol_featurizer=ConvMolFeaturizer(),
