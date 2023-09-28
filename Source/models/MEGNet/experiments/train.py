@@ -3,15 +3,16 @@ import os.path
 import sys
 from datetime import datetime
 
-import numpy as np
 import torch
 from dgllife.utils import CanonicalAtomFeaturizer, CanonicalBondFeaturizer
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
 
+from Source.models.GCNN.featurizers import DGLFeaturizer
 from Source.models.GCNN.trainer import GCNNTrainer
-from Source.models.MEGNet.featurizers import DGLFeaturizer, SkipatomFeaturizer, featurize_sdf_with_metal
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer
+from Source.models.MEGNet.featurizers import featurize_sdf_with_metal
 from Source.models.MEGNet.model import MEGNet
 from config import ROOT_DIR
 

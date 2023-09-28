@@ -15,35 +15,6 @@ from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from config import ROOT_DIR
 
 
-class DGLFeaturizer:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-
-    def featurize(self, mol, require_node_features=True, require_edge_features=True):
-        dgl_graph = mol_to_bigraph(mol, **self.kwargs)
-        networkx_graph = dgl.to_networkx(dgl_graph)
-        graph = from_networkx(networkx_graph)
-        if 'h' not in dgl_graph.ndata:
-            if require_node_features:
-                warnings.warn(f"can't featurize {Chem.MolToSmiles(mol)}: 'h' not in graph.ndata. Skipping.")
-                return None
-            else:
-                warnings.warn(f"No node_features in {Chem.MolToSmiles(mol)}")
-                dgl_graph.ndata['h'] = None
-        if 'e' not in dgl_graph.edata:
-            if require_edge_features:
-                warnings.warn(f"can't featurize {Chem.MolToSmiles(mol)}: 'e' not in graph.edata. Skipping.")
-                return None
-            else:
-                warnings.warn(f"No edge_features in {Chem.MolToSmiles(mol)}")
-                dgl_graph.edata['e'] = None
-            return None
-        graph.x = dgl_graph.ndata['h']
-        graph.edge_attr = dgl_graph.edata['e']
-        graph.id = None
-        return graph
-
-
 class SkipatomFeaturizer:
     """
     Class for extracting element features by skipatom_models approach

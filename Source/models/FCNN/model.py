@@ -42,7 +42,7 @@ class FCNN(BaseModel):
     def forward(self, x):
         x = self.fc_sequential(x)
         if self.use_out_sequential:
-            x = self.out_sequential(x)
+            x = {target: sequential(x) for target, sequential in self.out_sequentials.items()}
         return x
 
     def training_step(self, train_batch, *args, **kwargs):

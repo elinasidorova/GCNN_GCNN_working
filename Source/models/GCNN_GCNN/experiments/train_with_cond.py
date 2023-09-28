@@ -16,7 +16,7 @@ from Source.models.GCNN.trainer import GCNNTrainer
 sys.path.append(os.path.abspath("."))
 
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
-from Source.models.GCNN_FCNN.featurizers import DGLFeaturizer
+from Source.models.GCNN.featurizers import DGLFeaturizer
 from Source.models.GCNN_GCNN.featurizers import DglMetalFeaturizer, featurize_df
 from Source.models.GCNN_GCNN.model import GCNNGCNN
 from Source.data import balanced_train_valid_split, root_mean_squared_error
