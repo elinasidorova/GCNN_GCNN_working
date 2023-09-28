@@ -10,6 +10,26 @@ def root_mean_squared_error(*args, **kwargs):
     return np.sqrt(mean_squared_error(*args, **kwargs))
 
 
+def balanced_train_valid_test_split(datasets, n_folds, batch_size, shuffle_every_epoch, valid_size=None, test_size=0.1,
+                                    seed=17):
+    train_valid_datasets = [[] for _ in range(len(datasets))]
+    test = []
+
+    for dataset_id, dataset in enumerate(datasets):
+        mol_ids = list(range(len(dataset)))
+        if len(mol_ids) < 2:
+            train_valid_datasets[dataset_id] += [val for i, val in enumerate(dataset) if i in mol_ids]
+        else:
+            train_valid_index, test_index = train_test_split(mol_ids, test_size=test_size, random_state=seed,
+                                                             shuffle=False)
+            train_valid_datasets[dataset_id] += [val for i, val in enumerate(dataset) if i in train_valid_index]
+            test += [val for i, val in enumerate(dataset) if i in test_index]
+
+    test_loader = DataLoader(test, batch_size=batch_size)
+    folds = balanced_train_valid_split(train_valid_datasets, n_folds, batch_size, shuffle_every_epoch, valid_size, seed)
+    return folds, test_loader
+
+
 def balanced_train_valid_split(datasets, n_folds, batch_size, shuffle_every_epoch, valid_size=None, seed=17):
     train = [[] for _ in range(n_folds)]
     val = [[] for _ in range(n_folds)]

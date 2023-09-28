@@ -1,47 +1,46 @@
 import logging
 import os.path
 import sys
-from datetime import datetime
 
 import numpy as np
+import pandas as pd
 import torch
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
-from torch_geometric.loader import DataLoader
-from torch_geometric.nn import global_mean_pool, MFConv
+from torch_geometric.nn import MFConv, global_mean_pool
 from tqdm import tqdm
 
-sys.path.append(os.path.abspath("."))
-from Source.data import balanced_train_valid_split, root_mean_squared_error
-from Source.models.GCNN.trainer import GCNNTrainer
-from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling
 from config import ROOT_DIR
 
+sys.path.append(os.path.abspath("."))
+
+from Source.trainer import ModelShell
+from Source.data import root_mean_squared_error, balanced_train_valid_test_split
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
-
-
-test_metal = sys.argv[1]
 
 other_metals = ['Li', 'Be', 'Na', 'Mg', 'Al', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
                 'Ga', 'Rb', 'Sr', 'Y', 'Zr', 'Mo', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Cs', 'Ba', 'Hf', 'Re',
                 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi']
 Ln_metals = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', ]
 Ac_metals = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
-train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa", test_metal})
 
+train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa"})
 
-cv_folds = 5
+cv_folds = 10
+test_size = 0.1
 seed = 23
 batch_size = 64
 epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
-output_folder = ROOT_DIR / f"Output/OneM_cond/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
+output_dir = ROOT_DIR / "Output/Uncertainty/ensemble"
+train_folder = ROOT_DIR / f"Output/Uncertainty_ensemble/10fold_regression_2023_08_04_13_21_19"
 
 targets = ({
                "name": "logK",
@@ -94,35 +93,31 @@ train_datasets = [featurize_sdf_with_metal_and_conditions(path_to_sdf=os.path.jo
                                                           metal_featurizer=SkipatomFeaturizer())
                   for metal in tqdm(train_metals, desc="Featurizig")]
 logging.info("Splitting...")
-folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
-                                   batch_size=batch_size,
-                                   shuffle_every_epoch=True,
-                                   seed=seed)
+folds, test_loader = balanced_train_valid_test_split(train_datasets, n_folds=cv_folds,
+                                                     batch_size=batch_size,
+                                                     test_size=test_size,
+                                                     shuffle_every_epoch=True,
+                                                     seed=seed)
+train_loader, val_loader = folds[0]
+super_model = ModelShell(GCNN_FCNN, train_folder)
 
-test_loader = DataLoader(featurize_sdf_with_metal_and_conditions(
-    path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
-    mol_featurizer=ConvMolFeaturizer(),
-    metal_featurizer=SkipatomFeaturizer()),
-    batch_size=batch_size)
+for loader, name in zip((train_loader, val_loader, test_loader), ("train", "valid", "test")):
+    data = []
+    for sample in loader.dataset:
+        predictions = torch.cat([
+            model(sample)["logK"].unsqueeze(-1) for model in super_model.models
+        ], dim=-1)
+        logK = predictions.mean(dim=-1)
+        logK_var = predictions.var(dim=-1)
+        data += [{
+            "true_logK": sample.y["logK"].item(),
+            "pred_logK": logK.item(),
+            "pred_logK_std": torch.sqrt(logK_var).item()
+        }]
 
-model = GCNN_FCNN(
-    metal_features=next(iter(test_loader)).metal_x.shape[-1],
-    node_features=next(iter(test_loader)).x.shape[-1],
-    targets=targets,
-    **model_parameters,
-    optimizer=torch.optim.Adam,
-    optimizer_parameters=None,
-)
+    os.makedirs(output_dir, exist_ok=True)
+    pd.DataFrame(data).to_json(output_dir / f"{name}.json")
 
-trainer = GCNNTrainer(
-    model=model,
-    train_valid_data=folds,
-    test_data=test_loader,
-    output_folder=output_folder,
-    epochs=epochs,
-    es_patience=es_patience,
-    targets=targets,
-    seed=seed,
-)
+    print(f"{name} done")
 
-trainer.train_cv_models()
+print("All done")

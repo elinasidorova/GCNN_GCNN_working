@@ -36,11 +36,11 @@ class BaseModel(LightningModule):
                             f"Target '{target['name']}': binary_classification requires dim=1, got {target['dim']} instead")
                     self.out_sequentials[target["name"]] = nn.Sequential(
                         nn.Linear(self.last_common_dim, target["dim"], device=self.device),
-                        nn.Sigmoid())
+                        target["activation"] if "activation" in target else nn.Sigmoid())
                 elif target["mode"] == "multiclass_classification":
                     self.out_sequentials[target["name"]] = nn.Sequential(
                         nn.Linear(self.last_common_dim, target["dim"], device=self.device),
-                        nn.Softmax())
+                        target["activation"] if "activation" in target else nn.Softmax())
                 else:
                     raise ValueError(
                         "Invalid mode value, only 'regression', 'binary_classification' or 'multiclass_classification' are allowed")

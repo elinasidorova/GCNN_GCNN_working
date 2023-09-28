@@ -1,58 +1,62 @@
 import logging
 import os.path
 import sys
-from datetime import datetime
 
-import numpy as np
+import pandas as pd
 import torch
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from rdkit import Chem
 from torch import nn
 from torch_geometric.loader import DataLoader
-from torch_geometric.nn import global_mean_pool, MFConv
+from torch_geometric.nn import MFConv, global_mean_pool
 from tqdm import tqdm
 
-sys.path.append(os.path.abspath("."))
-from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN.trainer import GCNNTrainer
-from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
+from Source.models.GCNN_FCNN.experiments.uncertainty.MVE.metrics import r2_score_MVE, root_mean_squared_error_MVE, \
+    mean_absolute_error_MVE, negative_log_likelihood
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling
 from config import ROOT_DIR
 
+sys.path.append(os.path.abspath("."))
+
+from Source.trainer import ModelShell
+from Source.data import balanced_train_valid_test_split, balanced_train_valid_split
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
-
-
-test_metal = sys.argv[1]
 
 other_metals = ['Li', 'Be', 'Na', 'Mg', 'Al', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
                 'Ga', 'Rb', 'Sr', 'Y', 'Zr', 'Mo', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Cs', 'Ba', 'Hf', 'Re',
                 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi']
 Ln_metals = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', ]
 Ac_metals = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf']
-train_metals = list(set(["Y", "Sc"] + Ln_metals + Ac_metals) - {"Ac", "Pa", test_metal})
+
+train_metals = list(set(["Y", "Sc"] + Ln_metals))
+test_metals = list(set(Ac_metals) - {"Ac", "Pa"})
 
 
-cv_folds = 5
+cv_folds = 1
+test_size = 0.1
 seed = 23
 batch_size = 64
 epochs = 1000
 es_patience = 100
 mode = "regression"
 train_sdf_folder = ROOT_DIR / "Data/OneM_cond_adds"
-output_folder = ROOT_DIR / f"Output/OneM_cond/5fold/{test_metal}_{cv_folds}fold_{mode}_{time_mark}"
+output_dir = ROOT_DIR / "Output/Uncertainty/MVE_AcTest/"
+train_folder = ROOT_DIR / f"Output/Uncertainty_MVE/AcTest_1fold_regression_2023_08_07_13_36_03"
 
 targets = ({
                "name": "logK",
                "mode": "regression",
-               "dim": 1,
+               "dim": 2,
                "metrics": {
-                   "R2": (r2_score, {}),
-                   "RMSE": (root_mean_squared_error, {}),
-                   "MAE": (mean_absolute_error, {})
+                   "R2": (r2_score_MVE, {}),
+                   "RMSE": (root_mean_squared_error_MVE, {}),
+                   "MAE": (mean_absolute_error_MVE, {})
                },
-               "loss": nn.MSELoss(),
+               "loss": negative_log_likelihood,
            },)
 model_parameters = {
     "metal_fc_params": {
@@ -98,31 +102,32 @@ folds = balanced_train_valid_split(train_datasets, n_folds=cv_folds,
                                    batch_size=batch_size,
                                    shuffle_every_epoch=True,
                                    seed=seed)
+train_mols = []
+for metal in train_metals:
+    train_mols += [mol for mol in Chem.SDMolSupplier(os.path.join(train_sdf_folder, f"{metal}.sdf")) if mol is not None]
 
-test_loader = DataLoader(featurize_sdf_with_metal_and_conditions(
-    path_to_sdf=os.path.join(train_sdf_folder, f"{test_metal}.sdf"),
-    mol_featurizer=ConvMolFeaturizer(),
-    metal_featurizer=SkipatomFeaturizer()),
-    batch_size=batch_size)
+train_smiles = [Chem.MolToSmiles(m) for m in train_mols]
 
-model = GCNN_FCNN(
-    metal_features=next(iter(test_loader)).metal_x.shape[-1],
-    node_features=next(iter(test_loader)).x.shape[-1],
-    targets=targets,
-    **model_parameters,
-    optimizer=torch.optim.Adam,
-    optimizer_parameters=None,
-)
+test_data = []
+for test_metal in test_metals:
+    mols = [mol for mol in Chem.SDMolSupplier(os.path.join(train_sdf_folder, f"{test_metal}.sdf"))]
+    cleaned_mols = [m for m in mols if Chem.MolToSmiles(m) in train_smiles and m is not None]
+
+    test_data += featurize_sdf_with_metal_and_conditions(
+        molecules=cleaned_mols,
+        mol_featurizer=ConvMolFeaturizer(),
+        metal_featurizer=SkipatomFeaturizer())
+
+test_loader = DataLoader(test_data, batch_size=batch_size)
 
 trainer = GCNNTrainer(
-    model=model,
+    model=None,
     train_valid_data=folds,
     test_data=test_loader,
-    output_folder=output_folder,
-    epochs=epochs,
-    es_patience=es_patience,
     targets=targets,
     seed=seed,
 )
+trainer.models = ModelShell(GCNN_FCNN, train_folder).models
+result = trainer.calculate_metrics()
 
-trainer.train_cv_models()
+print(result)
