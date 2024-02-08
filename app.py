@@ -1,16 +1,29 @@
+import os
+
 import streamlit as st
 from streamlit_ketcher import st_ketcher
+import numpy as np
+from rdkit import Chem
+from rdkit.Chem import DataStructs
 
 from Source.explanations.exmol_explanations import explain_by_exmol
 from Source.explanations.node_shapley_explanations import explain_by_shapley_nodes
+from Source.applicability_domain.mahalanobis import MahalanobisAD
+from Source.applicability_domain.knn_ad import knnAD
 from Source.models.GCNN_FCNN.featurizers import Complex
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.trainer import ModelShell
 from config import ROOT_DIR
 
+st.set_page_config(layout="wide")
 MODEL = ModelShell(GCNN_FCNN, str(ROOT_DIR / "App_models" / "Y_Sc_f-elements_5fold_regression_2023_06_10_07_58_17"))
 AVAILABLE_METALS = ["Sc", "Y", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
-                    "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", ]
+                    "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf"]
+
+AD_PRECALC = os.path.join(ROOT_DIR, "App_models", "Y_Sc_f-elements_5fold_regression_2023_06_10_07_58_17",
+                          "ad_distances.npy")
+AD_DATASET = os.path.join(ROOT_DIR, "App_models", "Y_Sc_f-elements_5fold_regression_2023_06_10_07_58_17",
+                          "ad_dataset.npy")
 
 ketcher, conditions = st.columns(2)
 
@@ -28,7 +41,16 @@ if st.button('Predict'):
     complex = Complex(mol=smile_code, metal=metal,
                       valence=int(charge), temperature=float(temperature), ionic_str=float(ionic_str))
     prediction = MODEL(complex.graph)["logK"].item()
+
+    tar_fea = Chem.RDKFingerprint(Chem.MolFromSmiles(smile_code))
+    tar_vec = np.zeros((0,), dtype=np.int8)
+    DataStructs.ConvertToNumpyArray(tar_fea, tar_vec)
+    ad = knnAD(AD_PRECALC, np.load(AD_DATASET))
+    ad_value = ad.vect_in_ad(tar_vec)
+
     st.latex("\log_{10} K = %lf" % prediction, help="Estimated stability constant value")
+    if not ad_value:
+        st.text(f"Molecule is outside applicability domain - prediction is unreliable")
 
     with st.expander('Fragment importance'):
         with st.spinner('Investigating fragment importance...'):

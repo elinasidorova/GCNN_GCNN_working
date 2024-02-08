@@ -1,14 +1,21 @@
+import warnings
+import os
+
 import numpy as np
 from sklearn.neighbors import KDTree
 
 
 class knnAD:
-    def __init__(self, x_train, n_neighb=5, leaf_size=10):
+    def __init__(self, t_values_path, x_train, n_neighb=5, leaf_size=10):
+        self.t_values_path = t_values_path
         self.x_train = x_train
         self.n_neighb = n_neighb
         self.leaf_size = leaf_size
 
-        self.calc_t_values()
+        if os.path.exists(self.t_values_path):
+            self.t_values = np.load(self.t_values_path)
+        else:
+            self.calc_t_values()
 
     def calc_t_values(self):
         """
@@ -33,6 +40,8 @@ class knnAD:
         for i, value in enumerate(self.t_values):
             if value is None:
                 self.t_values[i] = np.nanmin(self.t_values)
+
+        np.save(self.t_values_path, np.array(self.t_values))
 
     def calc_mean_dists(self):
         tree = KDTree(self.x_train, self.leaf_size)
