@@ -1,7 +1,7 @@
 #!/bin/bash
 metals=('Ac' 'Th' 'Pa' 'U' 'Np' 'Pu' 'Am' 'Cm' 'Bk' 'Cf' 'La' 'Ce' 'Pr' 'Nd' 'Pm' 'Sm' 'Eu' 'Gd' 'Tb' 'Dy' 'Ho' 'Er' 'Tm' 'Yb' 'Lu')
 out_folder="train_Ln_OneMOut"
-output_folder="Output/Uncertainty_knn_OneMOut"
+output_folder="Output/Uncertainty_MVE_OneMOut"
 n_streems=10
 
 check_metal() {
@@ -19,11 +19,11 @@ check_metal() {
   return 0
 }
 for metal in "${metals[@]}"; do
-  while [ $(ps uaxw | grep "python Source/models/GCNN_FCNN/experiments/uncertainty/knn_latent/OneMOut/train.py" | grep -v grep | wc -l) -ge ${n_streems} ]; do
+  while [ $(ps uaxw | grep "python Source/models/GCNN_FCNN/experiments/uncertainty/MVE/OneMOut/train.py" | grep -v grep | wc -l) -ge ${n_streems} ]; do
     sleep 1
   done
   if check_metal "${metal}"; then
-    (nohup python Source/models/GCNN_FCNN/experiments/uncertainty/knn_latent/OneMOut/train.py "${metal}" > outs/${out_folder}/${metal}.out &)
+    (nohup python Source/models/GCNN_FCNN/GCNN/uncertainty/MVE/OneMOut/train.py "${metal}" > outs/${out_folder}/${metal}.out &)
     echo "Started processing ${metal}"
     sleep 20
   fi
