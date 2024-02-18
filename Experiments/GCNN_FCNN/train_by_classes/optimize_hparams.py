@@ -7,7 +7,6 @@ import pandas as pd
 import torch
 from dgllife.utils import AttentiveFPAtomFeaturizer, PAGTNAtomFeaturizer
 from dgllife.utils import CanonicalAtomFeaturizer
-from pytorch_lightning.loggers import MLFlowLogger
 from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
@@ -43,6 +42,7 @@ ACTIVATION_VARIANTS = {
     "PReLU": nn.PReLU(),
     "Tanhshrink": nn.Tanhshrink(),
 }
+DIM_LIMS = (64, 1024)
 targets = ({
                "name": "logK",
                "mode": "regression",
@@ -68,7 +68,7 @@ def objective(trial: optuna.Trial):
             "RMSprop": torch.optim.RMSprop,
             "SGD": torch.optim.SGD
         },
-        lr_lims=(1e-4, 1e-1),
+        lr_lims=(1e-2, 1e-2),
         featurizer_variants={
             "CanonicalAtomFeaturizer": CanonicalAtomFeaturizer(),
             "AttentiveFPAtomFeaturizer": AttentiveFPAtomFeaturizer(),
@@ -81,7 +81,7 @@ def objective(trial: optuna.Trial):
     model_parameters = GCNNFCNNParams(
         trial,
         metal_fc_params={
-            "dim_lims": (32, 512),
+            "dim_lims": DIM_LIMS,
             "n_layers_lims": (1, 4),
             "actf_variants": ACTIVATION_VARIANTS,
             "dropout_lims": (0, 0),
@@ -89,23 +89,23 @@ def objective(trial: optuna.Trial):
         },
         gcnn_params={
             "pre_fc_params": {
-                "dim_lims": (32, 512),
-                "n_layers_lims": (1, 4),
+                "dim_lims": DIM_LIMS,
+                "n_layers_lims": (1, 2),
                 "actf_variants": ACTIVATION_VARIANTS,
                 "dropout_lims": (0, 0),
                 "bn_variants": (True, False),
             },
             "post_fc_params": {
-                "dim_lims": (32, 512),
-                "n_layers_lims": (1, 4),
+                "dim_lims": DIM_LIMS,
+                "n_layers_lims": (1, 2),
                 "actf_variants": ACTIVATION_VARIANTS,
                 "dropout_lims": (0, 0),
                 "bn_variants": (True, False),
             },
             "n_conv_lims": (1, 3),
-            "dropout_lims": (0, 0.8),
+            "dropout_lims": (0.1, 0.5),
             "actf_variants": ACTIVATION_VARIANTS,
-            "dim_lims": (32, 512),
+            "dim_lims": DIM_LIMS,
             "conv_layer_variants": {
                 "MFConv": MFConv,
                 "GATConv": GATConv,
@@ -118,7 +118,7 @@ def objective(trial: optuna.Trial):
             },
         },
         post_fc_params={
-            "dim_lims": (32, 512),
+            "dim_lims": DIM_LIMS,
             "n_layers_lims": (1, 4),
             "actf_variants": ACTIVATION_VARIANTS,
             "dropout_lims": (0, 0),
@@ -190,4 +190,5 @@ study = optuna.create_study(
     load_if_exists=True,
     direction="minimize"
 )
+
 study.optimize(objective, n_trials=args.n_trials, timeout=args.timeout, catch=(ValueError,))
