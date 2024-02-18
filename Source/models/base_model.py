@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 
+import mlflow
 import torch.nn as nn
 import torch.optim.optimizer
 from pytorch_lightning import LightningModule
@@ -65,7 +66,8 @@ class BaseModel(LightningModule):
         true = train_batch.y
         loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
         self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
-        self.logger.log_metrics({"train_loss": loss.item()}, step=self.global_step)
+        fold = self.metadata["fold_ind"]
+        mlflow.log_metrics({f"train_loss_fold-{fold}": loss.item()}, step=self.global_step)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
@@ -73,7 +75,8 @@ class BaseModel(LightningModule):
         true = val_batch.y
         loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
         self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
-        self.logger.log_metrics({"val_loss": loss.item()}, step=self.global_step)
+        fold = self.metadata["fold_ind"]
+        mlflow.log_metrics({f"val_loss_fold-{fold}": loss.item()}, step=self.global_step)
         return loss
 
     def get_model_structure(self):

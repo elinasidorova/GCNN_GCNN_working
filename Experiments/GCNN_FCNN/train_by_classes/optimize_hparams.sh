@@ -1,0 +1,10 @@
+python Experiments/GCNN_FCNN/train_by_classes/optimize_hparams.py \
+  --n-trials 100 \
+  --train-data "Data/CoNiZnCu.csv" \
+  --conditions "charge temperature ionic_str" \
+  --experiment-name "CoNiZnCu" \
+  --folds 1 \
+  --seed 12 \
+  --epochs 1000 \
+  --es-patience 100 \
+  --mode "regression"

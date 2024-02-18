@@ -120,7 +120,8 @@ class ModelTrainer:
             self.train_model(model, train_dataloader, valid_dataloader, fold_ind, self.epochs)
 
         self.results_dict["general"] = self.calculate_metrics()
-        self.logger.log_metrics(self.results_dict["general"])
+        if self.logger is not None:
+            self.logger.log_metrics(self.results_dict["general"])
 
         if self.save_to_folder:
             with open(os.path.join(self.main_folder, "metrics.json"), "w") as jf:
