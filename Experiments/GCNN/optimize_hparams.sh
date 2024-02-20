@@ -1,3 +1,5 @@
+#!/bin/sh
+
 python Experiments/GCNN/optimize_hparams.py \
   --timeout 172796 \
   --train-data "Data/Cu.csv" \
