@@ -9,13 +9,14 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 from tqdm import tqdm
 
+from Experiments.GCNN_FCNN.uncertainty.MVE.metrics import r2_score_MVE, root_mean_squared_error_MVE, \
+    mean_absolute_error_MVE, negative_log_likelihood
+
 sys.path.append(os.path.abspath(""))
 
-from Source.models.GCNN_FCNN.experiments.uncertainty.MVE.metrics import r2_score_MVE, root_mean_squared_error_MVE, \
-    mean_absolute_error_MVE, negative_log_likelihood
 from Source.data import balanced_train_valid_split
 from Source.models.GCNN.trainer import GCNNTrainer
-from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer, featurize_sdf_with_metal_and_conditions
+from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling

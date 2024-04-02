@@ -146,7 +146,7 @@ def atom_features(atom,
         from rdkit import Chem
         results = one_of_k_encoding_unk(
             atom.GetSymbol(),
-            [
+            allowable_set=[
                 'C',
                 'N',
                 'O',
@@ -191,15 +191,25 @@ def atom_features(atom,
                 'Hg',
                 'Pb',
                 'Unknown'
-            ]) + one_of_k_encoding(atom.GetDegree(),
-                                   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) + \
-                  one_of_k_encoding_unk(atom.GetImplicitValence(), [0, 1, 2, 3, 4, 5, 6]) + \
-                  [atom.GetFormalCharge(), atom.GetNumRadicalElectrons()] + \
-                  one_of_k_encoding_unk(atom.GetHybridization(), [
-                      Chem.rdchem.HybridizationType.SP, Chem.rdchem.HybridizationType.SP2,
-                      Chem.rdchem.HybridizationType.SP3, Chem.rdchem.HybridizationType.
-                                        SP3D, Chem.rdchem.HybridizationType.SP3D2
-                  ]) + [atom.GetIsAromatic()]
+            ]
+        ) + one_of_k_encoding(
+            atom.GetDegree(),
+            allowable_set=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        ) + one_of_k_encoding_unk(
+            atom.GetImplicitValence(),
+            allowable_set=[0, 1, 2, 3, 4, 5, 6]
+        ) + [
+                      atom.GetFormalCharge(),
+                      atom.GetNumRadicalElectrons()
+                  ] + one_of_k_encoding_unk(
+            atom.GetHybridization(),
+            allowable_set=[
+                Chem.rdchem.HybridizationType.SP, Chem.rdchem.HybridizationType.SP2,
+                Chem.rdchem.HybridizationType.SP3, Chem.rdchem.HybridizationType.
+                SP3D, Chem.rdchem.HybridizationType.SP3D2
+            ]
+        ) + [atom.GetIsAromatic()]
+
         # In case of explicit hydrogen(QM8, QM9), avoid calling `GetTotalNumHs`
         if not explicit_H:
             results = results + one_of_k_encoding_unk(atom.GetTotalNumHs(),
@@ -356,8 +366,8 @@ class ConvMolFeaturizer():
         if not isinstance(self, other.__class__):
             return False
         return self.master_atom == other.master_atom and \
-               self.use_chirality == other.use_chirality and \
-               tuple(self.atom_properties) == tuple(other.atom_properties)
+            self.use_chirality == other.use_chirality and \
+            tuple(self.atom_properties) == tuple(other.atom_properties)
 
 
 def get_target_values(path_to_data, valuenames):

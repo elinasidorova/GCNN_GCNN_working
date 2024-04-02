@@ -79,6 +79,10 @@ class BaseModel(LightningModule):
         mlflow.log_metrics({f"val_loss_fold-{fold}": loss.item()}, step=self.global_step)
         return loss
 
+    def on_fit_end(self):
+        self.final_valid_loss
+
+
     def get_model_structure(self):
         def make_jsonable(x):
             try:
