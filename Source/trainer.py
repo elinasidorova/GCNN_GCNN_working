@@ -7,7 +7,6 @@ import pytorch_lightning
 import torch
 import torch_geometric
 from pytorch_lightning import Trainer
-from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import EarlyStopping
 from torch import nn
 
@@ -43,7 +42,7 @@ class ModelShell(nn.Module):
 class ModelTrainer:
     def __init__(self, model, train_valid_data, test_data=None, output_folder=None,
                  es_patience=20, epochs=1000, save_to_folder=True, seed=42,
-                 targets=()):
+                 targets=(), logger=None):
         pytorch_lightning.seed_everything(seed)
         torch_geometric.seed_everything(seed)
         self.initial_model = model
@@ -57,6 +56,7 @@ class ModelTrainer:
         self.results_dict = {}
 
         self.main_folder = output_folder
+        self.logger = logger
 
     def prepare_out_folder(self):
         def create(path):
@@ -116,9 +116,12 @@ class ModelTrainer:
 
         for fold_ind, (train_dataloader, valid_dataloader) in enumerate(self.train_valid_data):
             model = copy.deepcopy(self.initial_model)
+            model.metadata["fold_ind"] = fold_ind
             self.train_model(model, train_dataloader, valid_dataloader, fold_ind, self.epochs)
 
         self.results_dict["general"] = self.calculate_metrics()
+        if self.logger is not None:
+            self.logger.log_metrics(self.results_dict["general"])
 
         if self.save_to_folder:
             with open(os.path.join(self.main_folder, "metrics.json"), "w") as jf:
@@ -129,14 +132,8 @@ class ModelTrainer:
         Train model on certain fold and write down metrics
         """
         model.train()
-        if self.save_to_folder:
-            tb_logger = pl_loggers.TensorBoardLogger(
-                os.path.join(self.main_folder, f"fold_{current_fold_num + 1}", "logs"))
-        else:
-            tb_logger = False
         es_callback = EarlyStopping(patience=self.es_patience, monitor="val_loss")
-
-        trainer = Trainer(callbacks=[es_callback], log_every_n_steps=20, max_epochs=epochs, logger=tb_logger,
+        trainer = Trainer(callbacks=[es_callback], log_every_n_steps=20, max_epochs=epochs, logger=self.logger,
                           accelerator="auto", deterministic="warn")
         trainer.fit(model, train_dataloader, valid_dataloader)
 

@@ -45,13 +45,6 @@ class FCNN(BaseModel):
             x = {target: sequential(x) for target, sequential in self.out_sequentials.items()}
         return x
 
-    def training_step(self, train_batch, *args, **kwargs):
-        x, true = train_batch
-        pred = self.forward(x)
-        loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
-        self.log('train_loss', loss, prog_bar=True)
-        return loss
-
     def validation_step(self, val_batch, *args, **kwargs):
         x, true = val_batch
         pred = self.forward(x)

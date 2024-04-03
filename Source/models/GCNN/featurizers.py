@@ -1,15 +1,11 @@
-import copy
-import json
-import random
-import warnings
-import numpy as np
-from torch_geometric.data import Data
 import dgl
+import numpy as np
+import pandas as pd
 import torch
 from dgllife.utils import mol_to_bigraph
 from rdkit import Chem
-from torch_geometric.utils import from_networkx
 from torch.utils.data import Dataset
+from torch_geometric.utils import from_networkx
 
 
 class VecData(Dataset):
@@ -75,6 +71,7 @@ def one_of_k_encoding_unk(x, allowable_set):
     if x not in allowable_set:
         x = allowable_set[-1]
     return list(map(lambda s: x == s, allowable_set))
+
 
 def adj_to_edge(adj_list: list) -> torch.Tensor:
     """
@@ -195,187 +192,25 @@ def atom_features(atom,
         return np.array(results)
 
 
-class ConvMolFeaturizer():
-    name = ['conv_mol']
-
-    def __init__(self, master_atom=False, use_chirality=False,
-                 atom_properties=[]):
-        """
-        Parameters
-        ----------
-        master_atom: Boolean
-          if true create a fake atom with bonds to every other atom.
-          the initialization is the mean of the other atom features in
-          the molecule.  This technique is briefly discussed in
-          Neural Message Passing for Quantum Chemistry
-          https://arxiv.org/pdf/1704.01212.pdf
-        use_chirality: Boolean
-          if true then make the resulting atom features aware of the
-          chirality of the molecules in question
-        atom_properties: list of string or None
-          properties in the RDKit Mol object to use as additional
-          atom-level features in the larger molecular feature.  If None,
-          then no atom-level properties are used.  Properties should be in the
-          RDKit mol object should be in the form
-          atom XXXXXXXX NAME
-          where XXXXXXXX is a zero-padded 8 digit number coresponding to the
-          zero-indexed atom index of each atom and NAME is the name of the property
-          provided in atom_properties.  So "atom 00000000 sasa" would be the
-          name of the molecule level property in mol where the solvent
-          accessible surface area of atom 0 would be stored.
-
-        Since ConvMol is an object and not a numpy array, need to set dtype to
-        object.
-        """
-        self.dtype = object
-        self.master_atom = master_atom
-        self.use_chirality = use_chirality
-        self.atom_properties = list(atom_properties)
-
-    def _get_atom_properties(self, atom):
-        """
-        For a given input RDKit atom return the values of the properties
-        requested when initializing the featurize.  See the __init__ of the
-        class for a full description of the names of the properties
-
-        Parameters
-        ----------
-        atom: RDKit.rdchem.Atom
-          Atom to get the properties of
-        returns a numpy lists of floats of the same size as self.atom_properties
-        """
-        values = []
-        for prop in self.atom_properties:
-            mol_prop_name = str("atom %08d %s" % (atom.GetIdx(), prop))
-            try:
-                values.append(float(atom.GetOwningMol().GetProp(mol_prop_name)))
-            #     values.extend(fukui_desc)
-            except KeyError:
-                raise KeyError("No property %s found in %s in %s" %
-                               (mol_prop_name, atom.GetOwningMol(), self))
-        return np.array(values)
-
-    def get_fukui(self, mol) -> []:
-        pass
-
-    def featurize(self, mol, fukui_conf=100):
-        """Encodes mol as a ConvMol object."""
-        # Get the node features
-        idx_nodes = [(a.GetIdx(),
-                      np.concatenate((atom_features(
-                          a, use_chirality=self.use_chirality),
-                                      self._get_atom_properties(a))))
-                     for a in mol.GetAtoms()]
-        # TODO add fukui indices addition here
-
-        idx_nodes.sort()  # Sort by ind to ensure same order as rd_kit
-        idx, nodes = list(zip(*idx_nodes))
-
-        # Stack nodes into an array
-        nodes = np.vstack(nodes)
-        if self.master_atom:
-            master_atom_features = np.expand_dims(np.mean(nodes, axis=0), axis=0)
-            nodes = np.concatenate([nodes, master_atom_features], axis=0)
-
-        # Get bond lists with reverse edges included
-        edge_list = [
-            (b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()
-        ]
-
-        # Get canonical adjacency list
-        canon_adj_list = [[] for mol_id in range(len(nodes))]
-        for edge in edge_list:
-            canon_adj_list[edge[0]].append(edge[1])
-            canon_adj_list[edge[1]].append(edge[0])
-
-        if self.master_atom:
-            fake_atom_index = len(nodes) - 1
-            for index in range(len(nodes) - 1):
-                canon_adj_list[index].append(fake_atom_index)
-
-        return Data(x=torch.tensor(nodes, dtype=torch.float32),
-                    edge_index=adj_to_edge(canon_adj_list).t().contiguous())
-
-    def feature_length(self):
-        return 75 + len(self.atom_properties)
-
-    def __hash__(self):
-        atom_properties = tuple(self.atom_properties)
-        return hash((self.master_atom, self.use_chirality, atom_properties))
-
-    def __eq__(self, other):
-        if not isinstance(self, other.__class__):
-            return False
-        return self.master_atom == other.master_atom and \
-               self.use_chirality == other.use_chirality and \
-               tuple(self.atom_properties) == tuple(other.atom_properties)
-
 class DGLFeaturizer:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
-    def featurize(self, mol, require_node_features=True, require_edge_features=True):
+    def featurize(self, mol):
         dgl_graph = mol_to_bigraph(mol, **self.kwargs)
         networkx_graph = dgl.to_networkx(dgl_graph)
         graph = from_networkx(networkx_graph)
-        print(dgl_graph)
-        if 'h' not in dgl_graph.ndata:
-            if require_node_features:
-                warnings.warn(f"can't featurize {Chem.MolToSmiles(mol)}: 'h' not in graph.ndata. Skipping.")
-                return None
-            else:
-                warnings.warn(f"No node_features in {Chem.MolToSmiles(mol)}")
-                dgl_graph.ndata['h'] = None
-        if 'e' not in dgl_graph.edata:
-            if require_edge_features:
-                warnings.warn(f"can't featurize {Chem.MolToSmiles(mol)}: 'e' not in graph.edata. Skipping.")
-                return None
-            else:
-                warnings.warn(f"No edge_features in {Chem.MolToSmiles(mol)}")
-                dgl_graph.edata['e'] = None
-            return None
-        graph.x = dgl_graph.ndata['h']
-        graph.edge_attr = dgl_graph.edata['e']
+        graph.x = dgl_graph.ndata['h'] if 'h' in dgl_graph.ndata else None
+        graph.edge_attr = dgl_graph.edata['e'] if 'e' in dgl_graph.edata else None
         graph.id = None
         return graph
 
 
-def featurize_sdf(path_to_sdf=None, targets=None, molecules=None, mol_featurizer=DGLFeaturizer(), seed=42):
-    """
-    Extract molecules from .sdf file and featurize them
+def featurize_df(df: pd.DataFrame, mol_featurizer, target="logK"):
+    molecules = df["smiles"].apply(lambda s: Chem.MolFromSmiles(s))
+    graphs = molecules.apply(lambda m: mol_featurizer.featurize(m)).tolist()
+    targets = df[target].tolist()
+    for graph, target_value in zip(graphs, targets):
+        graph.y = {target: torch.tensor([[float(target_value)]])}
 
-    Parameters
-    ----------
-    path_to_sdf : str
-        path to .sdf file with data
-        single molecule in .sdf file can contain properties like "logK_{metal}"
-        each of these properties will be transformed into a different training sample
-    mol_featurizer : featurizer, optional
-        instance of the class used for extracting features of organic molecule
-    targets: []
-        Property names in sdf file
-    molecules: []
-
-    Returns
-    -------
-    features : list of torch_geometric.data objects
-        list of graphs corresponding to individual molecules from .sdf file
-    """
-    if targets is None:
-        raise ValueError("Need to specify target names in .sdf file")
-    if path_to_sdf is None and molecules is None:
-        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
-    elif path_to_sdf is not None and molecules is not None:
-        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
-    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
-    mol_graphs = [mol_featurizer.featurize(m) for m in mols]
-
-    all_data = []
-    for mol, graph in zip(mols, mol_graphs):
-        for target in targets:
-            new_graph = copy.deepcopy(graph)
-            new_graph.y = {"logK": torch.tensor([[float(mol.GetProp(target))]])}
-            all_data += [new_graph]
-    random.Random(seed).shuffle(all_data)
-
-    return all_data
+    return graphs

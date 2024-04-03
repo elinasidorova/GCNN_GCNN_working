@@ -1,5 +1,7 @@
 import json
+from collections import defaultdict
 
+import mlflow
 import torch.nn as nn
 import torch.optim.optimizer
 from pytorch_lightning import LightningModule
@@ -20,6 +22,7 @@ class BaseModel(LightningModule):
 
         self.valid_losses = []
         self.train_losses = []
+        self.metadata = defaultdict(None)
 
     def configure_out_layer(self):
         self.out_sequentials = ModuleDict()
@@ -63,6 +66,8 @@ class BaseModel(LightningModule):
         true = train_batch.y
         loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
         self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
+        fold = self.metadata["fold_ind"]
+        mlflow.log_metrics({f"train_loss_fold-{fold}": loss.item()}, step=self.global_step)
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
@@ -70,7 +75,13 @@ class BaseModel(LightningModule):
         true = val_batch.y
         loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
         self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
+        fold = self.metadata["fold_ind"]
+        mlflow.log_metrics({f"val_loss_fold-{fold}": loss.item()}, step=self.global_step)
         return loss
+
+    def on_fit_end(self):
+        self.final_valid_loss
+
 
     def get_model_structure(self):
         def make_jsonable(x):
