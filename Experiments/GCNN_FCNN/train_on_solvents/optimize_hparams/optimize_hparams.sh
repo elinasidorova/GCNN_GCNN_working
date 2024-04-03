@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
-python Experiments/GCNN_FCNN/train_by_classes/optimize_hparams.py \
+python Experiments/GCNN_FCNN/train_on_solvents/optimize_hparams/optimize_hparams.py \
   --timeout 172800 \
-  --train-data "Data/CoNiZnCu.csv" \
-  --conditions "charge temperature ionic_str" \
-  --experiment-name "CoNiZnCu_2" \
+  --train-sdf "Data/logS/train.sdf" \
+  --test-sdf "Data/logS/test.sdf" \
+  --experiment-name "optimize_hparams_test" \
   --folds 1 \
   --seed 12 \
   --epochs 1000 \
