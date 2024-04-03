@@ -1,12 +1,12 @@
+import copy
 import json
+import random
 from typing import Union, Optional
 
-import pandas as pd
 import torch
 from rdkit import Chem
 from rdkit.Chem import Mol
 
-from Source.models.GCNN.featurizers import featurize_df as featurize_df_GCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from config import ROOT_DIR
 
@@ -43,18 +43,97 @@ class SkipatomFeaturizer:
             features : torch.tensor
                 features of an element obtained from skipatom approach, shape (1, 200)
         """
-        return torch.tensor(self.get_vector[element], dtype=torch.float32).unsqueeze(0)
+        return torch.tensor(self.get_vector[element]).unsqueeze(0)
 
 
-def featurize_df(df: pd.DataFrame, mol_featurizer, metal_featurizer, target="logK", conditions=()):
-    graphs = featurize_df_GCNN(df, mol_featurizer, target=target)
-    for i, graph in enumerate(graphs):
-        graph.metal_x = torch.cat((
-            metal_featurizer.featurize(df["metal"][i]),
-            torch.tensor([[df[cond][i] for cond in conditions]], dtype=torch.float32)
-        ), dim=-1)
+def featurize_sdf_with_metal(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
+                             metal_featurizer=SkipatomFeaturizer(),
+                             seed=42):
+    """
+    Extract molecules from .sdf file and featurize them
 
-    return graphs
+    Parameters
+    ----------
+    path_to_sdf : str
+        path to .sdf file with data
+        single molecule in .sdf file can contain properties like "logK_{metal}"
+        each of these properties will be transformed into a different training sample
+    mol_featurizer : featurizer, optional
+        instance of the class used for extracting features of organic molecule
+    metal_featurizer : featurizer, optional
+        instance of the class used for extracting metal features
+
+    Returns
+    -------
+    features : list of torch_geometric.data objects
+        list of graphs corresponding to individual molecules from .sdf file
+    """
+    if path_to_sdf is None and molecules is None:
+        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
+    elif path_to_sdf is not None and molecules is not None:
+        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
+    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
+    mol_graphs = [mol_featurizer.featurize(m) for m in mols]
+
+    all_data = []
+    for mol, graph in zip(mols, mol_graphs):
+        targets = [prop for prop in mol.GetPropNames() if prop.startswith("logK_")]
+        for target in targets:
+            new_graph = copy.deepcopy(graph)
+
+            element_symbol = target.split("_")[-1]
+            new_graph.metal_x = metal_featurizer.featurize(element_symbol)
+            new_graph.y = {"logK": torch.tensor([[float(mol.GetProp(target))]])}
+            all_data += [new_graph]
+    random.Random(seed).shuffle(all_data)
+
+    return all_data
+
+
+def featurize_sdf_with_solvent(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
+                               seed=42, shuffle=True):
+    """"
+    Extract molecules from .sdf file and featurize them
+
+    Parameters
+    ----------
+    path_to_sdf : str
+        path to .sdf file with data
+        single molecule in .sdf file can contain properties like "logK_{metal}"
+        each of these properties will be transformed into a different training sample
+    molecules: List[Chem.Mol]
+        list of molecules, can be used instead of path_to_sdf
+    mol_featurizer : featurizer, optional
+        instance of the class used for extracting features of organic molecule
+    seed: int = 42
+        random seed for reproducibility
+    shuffle: bool
+        whether to shuffle data after featurization
+
+    Returns
+    -------
+    features : list of torch_geometric.data objects
+        list of graphs corresponding to individual molecules from .sdf file
+    """
+    if path_to_sdf is None and molecules is None:
+        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
+    elif path_to_sdf is not None and molecules is not None:
+        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
+    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
+    mol_features = [mol_featurizer.featurize(m) for m in mols]
+    all_data = []
+    for mol_ind in range(len(mols)):
+        logS_list = []
+        for target in [prop for prop in mols[mol_ind].GetPropNames() if prop.startswith("logS_")]:
+            logS_list += [float(mols[mol_ind].GetProp(target))]
+        features = copy.deepcopy(mol_features[mol_ind])
+        features.solvent = torch.tensor([81.0]).unsqueeze(0)
+        features.y = {"logS": torch.tensor([logS_list])}
+        all_data += [features]
+
+    if shuffle: random.Random(seed).shuffle(all_data)
+
+    return all_data
 
 
 class Complex:

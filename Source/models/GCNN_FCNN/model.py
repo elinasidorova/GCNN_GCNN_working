@@ -45,8 +45,8 @@ class GCNN_FCNN(BaseModel):
 
     def forward(self, graph, return_latent=False):
         x = self.graph_sequential(graph)
-        metal_x = self.metal_fc_sequential(graph.metal_x)
-        general = self.global_pooling(x, metal_x)
+        solvent = self.metal_fc_sequential(graph.solvent)
+        general = self.global_pooling(x, solvent)
         last_latent = self.post_fc_sequential(general)
         if self.use_out_sequential:
             general = {target: sequential(last_latent) for target, sequential in self.out_sequentials.items()}
