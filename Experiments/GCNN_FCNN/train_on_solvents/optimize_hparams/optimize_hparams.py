@@ -120,7 +120,7 @@ def objective(trial: optuna.Trial):
 
         mlflow.log_metrics(trainer.results_dict["general"])
     trial.set_user_attr(key="metrics", value=trainer.results_dict["general"])
-    return trainer.results_dict["general"]["logK_valid_RMSE"]
+    return trainer.results_dict["general"]["logS_valid_RMSE"]
 
 
 study = optuna.create_study(
