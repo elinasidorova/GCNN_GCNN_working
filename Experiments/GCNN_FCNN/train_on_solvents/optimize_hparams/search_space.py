@@ -5,6 +5,7 @@ from torch import nn
 from torch_geometric.nn import global_mean_pool, MFConv, global_max_pool, SAGEConv, GATConv, TransformerConv
 
 from Source.models.GCNN_FCNN.featurizers import SkipatomFeaturizer
+from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling, ConcatPooling, SumPooling, CrossAttentionPooling
 
 # is used below in METAL_FC_PARAMS, GCNN_PARAMS, POST_FC_PARAMS
@@ -13,7 +14,7 @@ ACTIVATION_VARIANTS = {
     "PReLU": nn.PReLU(),
     "Tanhshrink": nn.Tanhshrink(),
 }
-DIM_LIMS = (64, 1024)
+DIM_LIMS = (5, 10)
 
 # general parameters
 LR_LIMS = (1e-2, 1e-2)
@@ -28,13 +29,14 @@ FEATURIZER_VARIANTS = {
     "CanonicalAtomFeaturizer": CanonicalAtomFeaturizer(),
     "AttentiveFPAtomFeaturizer": AttentiveFPAtomFeaturizer(),
     "PAGTNAtomFeaturizer": PAGTNAtomFeaturizer(),
+    "ConvMolFeaturizer": ConvMolFeaturizer(),
 }
 METAL_FEATURIZER_VARIANTS = {"SkipatomFeaturizer": SkipatomFeaturizer()}
 
 # model parameters
 METAL_FC_PARAMS = {
-    "dim_lims": DIM_LIMS,
-    "n_layers_lims": (1, 4),
+    "dim_lims": (2, 7),
+    "n_layers_lims": (0, 0),
     "actf_variants": ACTIVATION_VARIANTS,
     "dropout_lims": (0, 0),
     "bn_variants": (True, False),

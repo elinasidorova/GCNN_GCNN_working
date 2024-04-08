@@ -80,7 +80,7 @@ class GCNNParams:
     def get_hidden_conv(self):
         n_layers = self.trial.suggest_int(f"{self.prefix}_n_layers", *self.n_layers_lims)
         dims = [
-            self.trial.suggest_int(f"{self.prefix}_hidden_{i}", *self.dim_lims, log=True)
+            2 ** self.trial.suggest_int(f"{self.prefix}_hidden_{i}", *self.dim_lims)
             for i in range(n_layers)
         ]
         return dims

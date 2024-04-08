@@ -65,7 +65,7 @@ class FCNNParams:
         self.use_batch_norm = self.trial.suggest_categorical(f"{self.prefix}_use_batch_norm", self.bn_variants)
         self.activation = self.get_activation()
         self.hidden = [
-            self.trial.suggest_int(f"{self.prefix}_hidden_{i}", *self.dim_lims, log=True)
+            2 ** self.trial.suggest_int(f"{self.prefix}_hidden_{i}", *self.dim_lims)
             for i in range(self.n_layers)
         ]
 
