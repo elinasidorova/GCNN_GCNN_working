@@ -24,6 +24,11 @@ class BaseModel(LightningModule):
         self.train_losses = []
         self.metadata = defaultdict(None)
 
+        self.val_step_outputs = []
+        self.val_step_true = []
+        self.train_step_outputs = []
+        self.train_step_true = []
+
     def configure_out_layer(self):
         self.out_sequentials = ModuleDict()
         if self.use_out_sequential:
@@ -64,21 +69,56 @@ class BaseModel(LightningModule):
     def training_step(self, train_batch, *args, **kwargs):
         pred = self.forward(train_batch)
         true = train_batch.y
-        loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
+        loss = torch.cat([
+            target["loss"](pred[target["name"]], true[target["name"]]).unsqueeze(0)
+            for target in self.targets
+        ], dim=0).sum()
         self.log('train_loss', loss, batch_size=train_batch.batch.max() + 1, prog_bar=True)
-        fold = self.metadata["fold_ind"]
-        mlflow.log_metrics({f"train_loss_fold-{fold}": loss.item()}, step=self.global_step)
+        self.train_step_outputs += [pred]
+        self.train_step_true += [true]
         return loss
 
     def validation_step(self, val_batch, *args, **kwargs):
         pred = self.forward(val_batch)
         true = val_batch.y
-        loss = sum([target["loss"](pred[target["name"]], true[target["name"]]) for target in self.targets])
+        loss = torch.cat([
+            target["loss"](pred[target["name"]], true[target["name"]]).unsqueeze(0)
+            for target in self.targets
+        ], dim=0).sum()
         self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
-        fold = self.metadata["fold_ind"]
-        mlflow.log_metrics({f"val_loss_fold-{fold}": loss.item()}, step=self.global_step)
+        self.val_step_outputs += [pred]
+        self.val_step_true += [true]
         return loss
 
+    def on_validation_epoch_end(self):
+        for target in self.targets:
+            with torch.no_grad():
+                predictions = torch.cat([pred[target["name"]] for pred in self.val_step_outputs], dim=0).cpu()
+                true_values = torch.cat([true[target["name"]] for true in self.val_step_true], dim=0).cpu()
+            loss = target["loss"](predictions, true_values).item()
+            metrics_to_log = {f"loss_{target['name']}_val_fold-{self.metadata['fold_ind']}": loss}
+            for metric_name, (metric, metric_params) in target["metrics"].items():
+                metric_value = metric(true_values, predictions, **metric_params)
+                log_name = f"{metric_name}_{target['name']}_val_fold-{self.metadata['fold_ind']}"
+                metrics_to_log[log_name] = metric_value
+            mlflow.log_metrics(metrics_to_log, step=self.current_epoch)
+        self.val_step_outputs = []
+        self.val_step_true = []
+
+    def on_train_epoch_end(self):
+        for target in self.targets:
+            with torch.no_grad():
+                predictions = torch.cat([pred[target["name"]] for pred in self.train_step_outputs], dim=0).cpu()
+                true_values = torch.cat([true[target["name"]] for true in self.train_step_true], dim=0).cpu()
+            loss = target["loss"](predictions, true_values).item()
+            metrics_to_log = {f"loss_{target['name']}_train_fold-{self.metadata['fold_ind']}": loss}
+            for metric_name, (metric, metric_params) in target["metrics"].items():
+                metric_value = metric(true_values, predictions, **metric_params)
+                log_name = f"{metric_name}_{target['name']}_val_fold-{self.metadata['fold_ind']}"
+                metrics_to_log[log_name] = metric_value
+            mlflow.log_metrics(metrics_to_log, step=self.current_epoch)
+        self.train_step_outputs = []
+        self.train_step_true = []
 
     def get_model_structure(self):
         def make_jsonable(x):
