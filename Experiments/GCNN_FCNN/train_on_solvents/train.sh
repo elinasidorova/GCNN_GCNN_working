@@ -2,7 +2,8 @@
 
 python Experiments/GCNN_FCNN/train_on_solvents/train.py \
   --train-sdf "Data/logS/train.sdf" \
-  --experiment-name "test" \
+  --test-sdf "Data/logS/test.sdf" \
+  --experiment-name "Train on solvents" \
   --folds 5 \
   --seed 23 \
   --batch-size 64 \

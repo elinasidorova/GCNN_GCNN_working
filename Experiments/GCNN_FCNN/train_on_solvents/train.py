@@ -5,7 +5,6 @@ from functools import partial
 
 import mlflow
 import torch
-from pytorch_lightning.loggers import MLFlowLogger
 from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
@@ -37,10 +36,6 @@ parser.add_argument('--mode', type=str, default="regression",
                     help='Mode of the target - regression, binary_classification or multiclass_classification')
 parser.add_argument('--learning-rate', default=1e-3, type=float, help='Learning rate')
 args = parser.parse_args()
-
-args.train_sdf = "Data/logS/train.sdf"
-args.test_sdf = "Data/logS/test.sdf"
-args.experiment_name = "test"
 
 # target parameters
 targets = ({
@@ -121,18 +116,20 @@ model = GCNN_FCNN(
     optimizer_parameters=None,
 )
 
-mlf_logger = MLFlowLogger(experiment_name=args.experiment_name)
-mlf_logger.log_hyperparams(args)
+mlflow.set_experiment(args.experiment_name)
+with mlflow.start_run():
+    mlflow.log_params(args.__dict__)
+    mlflow.set_tags({"datetime_start": datetime.now()})
 
-trainer = GCNNTrainer(
-    model=model,
-    train_valid_data=folds,
-    test_data=test_loader,
-    output_folder=str(ROOT_DIR / "Output" / args.experiment_name),
-    epochs=args.epochs,
-    es_patience=args.es_patience,
-    targets=targets,
-    seed=args.seed,
-    logger=mlf_logger,
-)
-trainer.train_cv_models()
+    trainer = GCNNTrainer(
+        model=model,
+        train_valid_data=folds,
+        test_data=test_loader,
+        output_folder=str(ROOT_DIR / "Output" / args.experiment_name),
+        epochs=args.epochs,
+        es_patience=args.es_patience,
+        targets=targets,
+        seed=args.seed,
+    )
+    trainer.train_cv_models()
+    mlflow.log_metrics(trainer.results_dict["general"])
