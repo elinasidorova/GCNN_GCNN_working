@@ -127,7 +127,7 @@ def featurize_sdf_with_solvent(path_to_sdf=None, molecules=None, mol_featurizer=
         for target in [prop for prop in mols[mol_ind].GetPropNames() if prop.startswith("logS_")]:
             logS_list += [float(mols[mol_ind].GetProp(target))]
         features = copy.deepcopy(mol_features[mol_ind])
-        features.solvent = torch.tensor([81.0]).unsqueeze(0)
+        features.x_fully_connected = torch.tensor([81.0]).unsqueeze(0)
         features.y = {"logS": torch.tensor([logS_list])}
         all_data += [features]
 

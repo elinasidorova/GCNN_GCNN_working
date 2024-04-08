@@ -5,7 +5,6 @@ from functools import partial
 
 import mlflow
 import torch
-from dgllife.utils import CanonicalAtomFeaturizer
 from pytorch_lightning.loggers import MLFlowLogger
 from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
@@ -13,10 +12,10 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_mean_pool, MFConv
 
 from Source.data import balanced_train_valid_split, root_mean_squared_error
-from Source.models.GCNN.featurizers import DGLFeaturizer
 from Source.models.GCNN.trainer import GCNNTrainer
 from Source.models.GCNN_FCNN.featurizers import featurize_sdf_with_solvent
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
+from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling
 from config import ROOT_DIR
 
@@ -38,6 +37,10 @@ parser.add_argument('--mode', type=str, default="regression",
                     help='Mode of the target - regression, binary_classification or multiclass_classification')
 parser.add_argument('--learning-rate', default=1e-3, type=float, help='Learning rate')
 args = parser.parse_args()
+
+args.train_sdf = "Data/logS/train.sdf"
+args.test_sdf = "Data/logS/test.sdf"
+args.experiment_name = "test"
 
 # target parameters
 targets = ({
@@ -90,7 +93,7 @@ model_parameters = {
 
 featurize = partial(
     featurize_sdf_with_solvent,
-    mol_featurizer=DGLFeaturizer(add_self_loop=False, node_featurizer=CanonicalAtomFeaturizer()),
+    mol_featurizer=ConvMolFeaturizer(),
 )
 
 train_val_dataset = featurize(path_to_sdf=str(ROOT_DIR / args.train_sdf))
@@ -110,7 +113,7 @@ else:
     test_loader = None
 
 model = GCNN_FCNN(
-    metal_features=train_val_dataset[0].solvent.shape[-1],
+    metal_features=train_val_dataset[0].x_fully_connected.shape[-1],
     node_features=train_val_dataset[0].x.shape[-1],
     targets=targets,
     **model_parameters,

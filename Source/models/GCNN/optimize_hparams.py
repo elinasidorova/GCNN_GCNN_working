@@ -1,6 +1,7 @@
 from inspect import isfunction, isclass, signature
 
 import optuna
+from dgllife.utils import BaseAtomFeaturizer
 
 from Source.models.FCNN.optimize_hparams import GeneralParams as FCNNGeneralParams, FCNNParams
 from Source.models.GCNN.featurizers import DGLFeaturizer
@@ -12,9 +13,9 @@ class GeneralParams(FCNNGeneralParams):
 
     def get_featurizer(self):
         featurizer = super().get_featurizer()
-        add_self_loop = self.trial.suggest_categorical("add_self_loop", (True, False))
-        featurizer = DGLFeaturizer(add_self_loop=add_self_loop, node_featurizer=featurizer)
-
+        if isinstance(featurizer, BaseAtomFeaturizer):
+            add_self_loop = self.trial.suggest_categorical("add_self_loop", (True, False))
+            featurizer = DGLFeaturizer(add_self_loop=add_self_loop, node_featurizer=featurizer)
         return featurizer
 
 

@@ -254,7 +254,7 @@ class ECFPMolFeaturizer:
         return [self.featurize(mol) for mol in mols if mol]
 
 
-class ConvMolFeaturizer():
+class ConvMolFeaturizer:
     name = ['conv_mol']
 
     def __init__(self, master_atom=False, use_chirality=False,

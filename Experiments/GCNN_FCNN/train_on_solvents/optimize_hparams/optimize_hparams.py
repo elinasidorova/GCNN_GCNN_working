@@ -37,10 +37,6 @@ parser.add_argument('--n-trials', type=int, default=None, help='Number of optuna
 parser.add_argument('--timeout', type=int, default=None, help='Time limit for optuna study (in seconds)')
 args = parser.parse_args()
 
-args.train_sdf = "Data/logS/train.sdf"
-args.test_sdf = "Data/logS/test.sdf"
-args.experiment_name = "optuna_logS_test"
-
 targets = ({
                "name": "logS",
                "mode": "regression",
@@ -75,7 +71,7 @@ def objective(trial: optuna.Trial):
 
     featurize = partial(
         featurize_sdf_with_solvent,
-        mol_featurizer=DGLFeaturizer(add_self_loop=False, node_featurizer=CanonicalAtomFeaturizer()),
+        mol_featurizer=general_params["featurizer"],
     )
 
     train_val_dataset = featurize(path_to_sdf=str(ROOT_DIR / args.train_sdf))
@@ -94,7 +90,7 @@ def objective(trial: optuna.Trial):
         test_loader = None
 
     model = GCNN_FCNN(
-        metal_features=train_val_dataset[0].solvent.shape[-1],
+        metal_features=train_val_dataset[0].x_fully_connected.shape[-1],
         node_features=train_val_dataset[0].x.shape[-1],
         targets=targets,
         **model_parameters,
