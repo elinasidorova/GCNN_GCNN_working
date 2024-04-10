@@ -8,7 +8,7 @@ import torch
 from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
 from torch_geometric.loader import DataLoader
-from torch_geometric.nn import global_mean_pool, MFConv
+from torch_geometric.nn import global_mean_pool, MFConv, SAGEConv
 
 from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN.trainer import GCNNTrainer
@@ -53,8 +53,8 @@ targets = ({
 # model parameters
 model_parameters = {
     "metal_fc_params": {
-        "hidden": (256, 128, 128, 64, 64,),
-        "dropout": 0.25108912274809364,
+        "hidden": (),
+        "dropout": 0,
         "use_bn": False,
         "actf": nn.LeakyReLU(),
     },
@@ -70,15 +70,15 @@ model_parameters = {
             "use_bn": False,
             "actf": nn.LeakyReLU(),
         },
-        "hidden_conv": (128, 128, 64,),
+        "hidden_conv": (512, 128, 128,),
         "conv_dropout": 0.27936243337975536,
         "conv_actf": nn.LeakyReLU(),
-        "conv_layer": MFConv,
+        "conv_layer": SAGEConv,
         "conv_parameters": None,
         "graph_pooling": global_mean_pool
     },
     "post_fc_params": {
-        "hidden": (256,),
+        "hidden": (128, 64, 16),
         "dropout": 0.06698879155641034,
         "use_bn": False,
         "actf": nn.LeakyReLU(),

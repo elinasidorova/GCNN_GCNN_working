@@ -6,7 +6,7 @@ python Experiments/GCNN_FCNN/train_on_solvents/train.py \
   --experiment-name "Train on solvents" \
   --folds 5 \
   --seed 23 \
-  --batch-size 64 \
+  --batch-size 20 \
   --epochs 1000 \
   --es-patience 100 \
   --mode "regression"
