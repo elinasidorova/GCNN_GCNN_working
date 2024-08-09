@@ -3,7 +3,6 @@ from argparse import ArgumentParser
 from datetime import datetime
 from functools import partial
 
-import mlflow
 import torch
 from sklearn.metrics import r2_score, mean_absolute_error
 from torch import nn
@@ -12,7 +11,7 @@ from torch_geometric.nn import global_mean_pool, MFConv, SAGEConv
 
 from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN.trainer import GCNNTrainer
-from Source.models.GCNN_FCNN.featurizers import featurize_sdf_with_solvent
+from Source.models.GCNN_FCNN.featurizers import featurize_sdf_with_solvent_MP_BP
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling
@@ -20,7 +19,6 @@ from config import ROOT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
-mlflow.set_tracking_uri(uri="http://127.0.0.1:8890")
 
 parser = ArgumentParser()
 parser.add_argument('--train-sdf', type=str, help='Path to the data file')  # required=True,
@@ -39,7 +37,7 @@ args = parser.parse_args()
 
 # target parameters
 targets = ({
-               "name": "logS",
+               "name": "Solubility",
                "mode": "regression",
                "dim": 1,
                "metrics": {
@@ -87,7 +85,7 @@ model_parameters = {
 }
 
 featurize = partial(
-    featurize_sdf_with_solvent,
+    featurize_sdf_with_solvent_MP_BP,
     mol_featurizer=ConvMolFeaturizer(),
 )
 
@@ -116,20 +114,16 @@ model = GCNN_FCNN(
     optimizer_parameters=None,
 )
 
-mlflow.set_experiment(args.experiment_name)
-with mlflow.start_run():
-    mlflow.log_params(args.__dict__)
-    mlflow.set_tags({"datetime_start": datetime.now()})
 
-    trainer = GCNNTrainer(
-        model=model,
-        train_valid_data=folds,
-        test_data=test_loader,
-        output_folder=str(ROOT_DIR / "Output" / args.experiment_name),
-        epochs=args.epochs,
-        es_patience=args.es_patience,
-        targets=targets,
-        seed=args.seed,
-    )
-    trainer.train_cv_models()
-    mlflow.log_metrics(trainer.results_dict["general"])
+trainer = GCNNTrainer(
+    model=model,
+    train_valid_data=folds,
+    test_data=test_loader,
+    output_folder=str(ROOT_DIR / "Output" / args.experiment_name),
+    epochs=args.epochs,
+    es_patience=args.es_patience,
+    targets=targets,
+    seed=args.seed,
+)
+
+trainer.train_cv_models()
