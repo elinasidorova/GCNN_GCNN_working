@@ -158,7 +158,7 @@ def objective(trial: optuna.Trial):
     model_parameters = GCNNParams(
         trial,
         pre_fc_params={
-            "dim_lims": (32, 1024),
+            "dim_lims": (2, 10), # >>> 2 ** x where x is in range (2, 10) 
             "n_layers_lims": (1, 4),
             "actf_variants": {
                 "LeakyReLU": nn.LeakyReLU(),
@@ -169,7 +169,7 @@ def objective(trial: optuna.Trial):
             "bn_variants": (True, False),
         },
         post_fc_params={
-            "dim_lims": (32, 1024),
+            "dim_lims": (2, 10), # >>> 2 ** x where x is in range (2, 10) 
             "n_layers_lims": (1, 5),
             "actf_variants": {
                 "LeakyReLU": nn.LeakyReLU(),
@@ -186,7 +186,7 @@ def objective(trial: optuna.Trial):
             "PReLU": nn.PReLU(),
             "Tanhshrink": nn.Tanhshrink(),
         },
-        dim_lims=(32, 1024),
+        dim_lims=(2, 10), # >>> 2 ** x where x is in range (2, 10) 
         conv_layer_variants={
             "MFConv": MFConv,
             "GATConv": GATConv,
