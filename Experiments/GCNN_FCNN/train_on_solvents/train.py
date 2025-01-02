@@ -11,7 +11,7 @@ from torch_geometric.nn import global_mean_pool, MFConv, SAGEConv
 
 from Source.data import balanced_train_valid_split, root_mean_squared_error
 from Source.models.GCNN.trainer import GCNNTrainer
-from Source.models.GCNN_FCNN.featurizers import featurize_sdf_with_solvent_MP_BP
+from Source.models.GCNN_FCNN.featurizers import featurize_sdf_with_solvent_united
 from Source.models.GCNN_FCNN.model import GCNN_FCNN
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from Source.models.global_poolings import MaxPooling
@@ -21,8 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":", "_").split(".")[0]
 
 parser = ArgumentParser()
-parser.add_argument('--train-sdf', type=str, help='Path to the data file')  # required=True,
-parser.add_argument('--test-sdf', type=str, help='Path to the data file')
+parser.add_argument('--sdf', type=str, help='Path to the data file')  # required=True,
 parser.add_argument('--experiment-name', type=str, help='The name of the experiment')  # required=True,
 parser.add_argument('--max-samples', type=int, default=None, help='Use only a several samples for training')
 parser.add_argument('--folds', type=int, default=1, help='Number of folds for cross-validation')
@@ -33,6 +32,8 @@ parser.add_argument('--es-patience', type=int, default=100, help='Number of epoc
 parser.add_argument('--mode', type=str, default="regression",
                     help='Mode of the target - regression, binary_classification or multiclass_classification')
 parser.add_argument('--learning-rate', default=1e-3, type=float, help='Learning rate')
+parser.add_argument('--include-descriptors', type=str, default='', help='A string with additional descriptors separated by a space')
+parser.add_argument('--test-solvents', type=str, default='water', help='A string with the names of solvents on which the model will be tested')
 args = parser.parse_args()
 
 # target parameters
@@ -85,11 +86,12 @@ model_parameters = {
 }
 
 featurize = partial(
-    featurize_sdf_with_solvent_MP_BP,
-    mol_featurizer=ConvMolFeaturizer(),
+    featurize_sdf_with_solvent_united,
+    mol_featurizer=ConvMolFeaturizer(), include_descriptors=args.include_descriptors,
+    test_solvents=args.test_solvents,
 )
 
-train_val_dataset = featurize(path_to_sdf=str(ROOT_DIR / args.train_sdf))
+train_val_dataset, test_dataset = featurize(path_to_sdf=str(ROOT_DIR / args.sdf))
 logging.info("Splitting...")
 folds = balanced_train_valid_split(
     datasets=[train_val_dataset],
@@ -99,11 +101,13 @@ folds = balanced_train_valid_split(
     seed=args.seed
 )
 
-if args.test_sdf is not None:
-    test_dataset = featurize(path_to_sdf=str(ROOT_DIR / args.test_sdf))
-    test_loader = DataLoader(test_dataset)
-else:
-    test_loader = None
+test_loader = DataLoader(test_dataset)
+
+# if args.test_sdf is not None:
+#     test_dataset = featurize(path_to_sdf=str(ROOT_DIR / args.test_sdf))
+#     test_loader = DataLoader(test_dataset)
+# else:
+#     test_loader = None
 
 model = GCNN_FCNN(
     metal_features=train_val_dataset[0].x_fully_connected.shape[-1],

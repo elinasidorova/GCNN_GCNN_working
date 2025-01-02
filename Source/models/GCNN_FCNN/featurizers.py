@@ -3,6 +3,7 @@ import json
 import random
 from typing import Union, Optional
 
+import rdkit
 import torch
 from rdkit import Chem
 from rdkit.Chem import Mol
@@ -10,8 +11,10 @@ from rdkit.Chem import Mol
 from Source.models.GCNN_FCNN.old_featurizer import ConvMolFeaturizer
 from config import ROOT_DIR
 
-from rdkit.Chem import MACCSkeys, AllChem, DataStructs, Descriptors
+from rdkit.Chem import MACCSkeys, AllChem, DataStructs, Descriptors, rdFingerprintGenerator
 import numpy as np
+
+from rdkit.Avalon.pyAvalonTools import GetAvalonFP
 
 
 class SkipatomFeaturizer:
@@ -170,13 +173,23 @@ class Complex:
         if self.logk:
             self.graph.y = torch.tensor([self.logk])
 
+def get_ecfc(molecule):
+    #ecfc_gen = AllChem.GetMorganGenerator(radius=2, fpSize = 1024)
+    ecfc_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize = 1024)
+    ecfc_array = np.zeros((1024,), dtype = int)
+    ecfc = ecfc_gen.GetCountFingerprint(molecule)
+    DataStructs.ConvertToNumpyArray(ecfc, ecfc_array)
+    return ecfc_array
+
+rdkit.Chem.rdFingerprintGenerator.GetMorganGenerator
+
 def get_solvent_vector(str):
     """"
     Implements a vector representation of the solvent
     based on MACCS keys and rdkit descriptors
 
     """
-    #str = mol.GetProp('Solvent')
+    
     names_dict = {'acetyl acetate': 'CC(=O)OC(C)=O', 'chloroform': 'ClC(Cl)Cl', 'n-butanol': 'CCCCO',
                   'n-heptane': 'CCCCCCC', 'γ-butyrolactone': 'O=C1CCCO1', 'DMAC': 'CN(C)C(C)=O',
                   'isooctanol': 'CC(C)CCCCCO', 'isopropyl acetate': 'CC(C)OC(C)=O', 'n-pentanol': 'CCCCCO',
@@ -308,15 +321,18 @@ def get_solvent_vector(str):
         vector += [Chem.Lipinski.NumAromaticHeterocycles(solvent_mol)]
         vector += [Chem.Lipinski.NumSaturatedHeterocycles(solvent_mol)]
 
-        vector += AllChem.GetMACCSKeysFingerprint(solvent_mol)
+        vector.extend(list(AllChem.GetMACCSKeysFingerprint(solvent_mol)))
 
-        #vector += [float(mol.GetProp('T,K'))]
-        # return torch.tensor(vector).unsqueeze(0)
+        vector.extend(get_ecfc(solvent_mol))
+
+        
         return vector
     else:
         raise ValueError(f"invalid molecule input type: {mol.GetProp('Solvent')}")
-def featurize_sdf_with_solvent_elina(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
-                               seed=42, shuffle=True):
+
+
+def featurize_sdf_with_solvent_united(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
+                               seed=42, shuffle=True, include_descriptors='', test_solvents='water'):
     """"
     Extract molecules from .sdf file and featurize them
 
@@ -334,6 +350,8 @@ def featurize_sdf_with_solvent_elina(path_to_sdf=None, molecules=None, mol_featu
         random seed for reproducibility
     shuffle: bool
         whether to shuffle data after featurization
+    include_descriptors: str
+        string with additional descriptors separated by a space
 
     Returns
     -------
@@ -347,7 +365,7 @@ def featurize_sdf_with_solvent_elina(path_to_sdf=None, molecules=None, mol_featu
     mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
     mol_features = [mol_featurizer.featurize(m) for m in mols]
 
-    all_data = []
+    all_data_train, all_data_test = [], []
 
 
     for mol_ind in range(len(mols)):
@@ -355,130 +373,32 @@ def featurize_sdf_with_solvent_elina(path_to_sdf=None, molecules=None, mol_featu
         for target in [prop for prop in mols[mol_ind].GetPropNames() if prop.startswith("Solubility")]:
             logS_list += [float(mols[mol_ind].GetProp(target))]
             element_symbol = mols[mol_ind].GetProp('Solvent')
-            vector = [float(mols[mol_ind].GetProp('T,K'))] + get_solvent_vector(element_symbol)
+            vector = get_solvent_vector(element_symbol)
+
+            #dG eps BP_mols BP_solvs
+            if 'dG' in include_descriptors:
+                vector += [float(mols[mol_ind].GetProp('dG'))]
+            if 'eps' in include_descriptors:
+                vector += [float(mols[mol_ind].GetProp('eps'))]
+            if 'BP_mols' in include_descriptors:
+                vector += [float(mols[mol_ind].GetProp('BP_mols'))]
+            if 'BP_solvs' in include_descriptors:
+                vector += [float(mols[mol_ind].GetProp('BP_solvs'))]
+            
             vector = np.array(vector, dtype=np.float32)
 
         features = copy.deepcopy(mol_features[mol_ind])
-        # features.x_fully_connected = torch.cat((get_solvent_vector(element_symbol), conditions), dim=-1)
         features.x_fully_connected = torch.tensor(vector).unsqueeze(0)
         features.y = {"Solubility": torch.tensor([logS_list])}
-        all_data += [features]
+        if mols[mol_ind].GetProp('Solvent') in test_solvents:
+            all_data_test += [features]
+        else:
+            all_data_train += [features]
 
-    if shuffle: random.Random(seed).shuffle(all_data)
-
-
-    return all_data
-
-
-def featurize_sdf_with_solvent_elina_MOPAC(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
-                               seed=42, shuffle=True):
-    """"
-    Extract molecules from .sdf file and featurize them
-
-    Parameters
-    ----------
-    path_to_sdf : str
-        path to .sdf file with data
-        single molecule in .sdf file can contain properties like "logK_{metal}"
-        each of these properties will be transformed into a different training sample
-    molecules: List[Chem.Mol]
-        list of molecules, can be used instead of path_to_sdf
-    mol_featurizer : featurizer, optional
-        instance of the class used for extracting features of organic molecule
-    seed: int = 42
-        random seed for reproducibility
-    shuffle: bool
-        whether to shuffle data after featurization
-
-    Returns
-    -------
-    features : list of torch_geometric.data objects
-        list of graphs corresponding to individual molecules from .sdf file
-    """
-    if path_to_sdf is None and molecules is None:
-        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
-    elif path_to_sdf is not None and molecules is not None:
-        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
-    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
-    mol_features = [mol_featurizer.featurize(m) for m in mols]
-
-    all_data = []
+    if shuffle:
+        random.Random(seed).shuffle(all_data_test)
+        random.Random(seed).shuffle(all_data_train)
+        
 
 
-    for mol_ind in range(len(mols)):
-        logS_list = []
-        for target in [prop for prop in mols[mol_ind].GetPropNames() if prop.startswith("Solubility")]:
-            logS_list += [float(mols[mol_ind].GetProp(target))]
-            element_symbol = mols[mol_ind].GetProp('Solvent')
-            vector = [float(mols[mol_ind].GetProp('T,K'))] + get_solvent_vector(element_symbol)
-            vector += [float(mols[mol_ind].GetProp('dGsolv'))]
-            vector += [float(mols[mol_ind].GetProp('eps'))]
-            vector += [float(mols[mol_ind].GetProp('BP'))]
-            vector = np.array(vector, dtype=np.float32)
-
-        features = copy.deepcopy(mol_features[mol_ind])
-        # features.x_fully_connected = torch.cat((get_solvent_vector(element_symbol), conditions), dim=-1)
-        features.x_fully_connected = torch.tensor(vector).unsqueeze(0)
-        features.y = {"Solubility": torch.tensor([logS_list])}
-        all_data += [features]
-
-    if shuffle: random.Random(seed).shuffle(all_data)
-
-
-    return all_data
-
-
-def featurize_sdf_with_solvent_MP_BP(path_to_sdf=None, molecules=None, mol_featurizer=ConvMolFeaturizer(),
-                               seed=42, shuffle=True):
-    """"
-    Extract molecules from .sdf file and featurize them
-
-    Parameters
-    ----------
-    path_to_sdf : str
-        path to .sdf file with data
-        single molecule in .sdf file can contain properties like "logK_{metal}"
-        each of these properties will be transformed into a different training sample
-    molecules: List[Chem.Mol]
-        list of molecules, can be used instead of path_to_sdf
-    mol_featurizer : featurizer, optional
-        instance of the class used for extracting features of organic molecule
-    seed: int = 42
-        random seed for reproducibility
-    shuffle: bool
-        whether to shuffle data after featurization
-
-    Returns
-    -------
-    features : list of torch_geometric.data objects
-        list of graphs corresponding to individual molecules from .sdf file
-    """
-    if path_to_sdf is None and molecules is None:
-        raise ValueError("'path_to_sdf' or 'molecules' parameter should be stated, got neither")
-    elif path_to_sdf is not None and molecules is not None:
-        raise ValueError("Only one source ('path_to_sdf' or 'molecules' parameter) should be stated, got both")
-    mols = molecules or [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
-    mol_features = [mol_featurizer.featurize(m) for m in mols]
-
-    all_data = []
-
-
-    for mol_ind in range(len(mols)):
-        logS_list = []
-        for target in [prop for prop in mols[mol_ind].GetPropNames() if prop.startswith("Solubility")]:
-            logS_list += [float(mols[mol_ind].GetProp(target))]
-            #element_symbol = mols[mol_ind].GetProp('Solvent')
-            vector = [float(mols[mol_ind].GetProp('BP'))] #+ get_solvent_vector(element_symbol)
-            #vector += [float(mols[mol_ind].GetProp('MP'))]
-            vector = np.array(vector, dtype=np.float32)
-
-        features = copy.deepcopy(mol_features[mol_ind])
-        # features.x_fully_connected = torch.cat((get_solvent_vector(element_symbol), conditions), dim=-1)
-        features.x_fully_connected = torch.tensor(vector).unsqueeze(0)
-        features.y = {"Solubility": torch.tensor([logS_list])}
-        all_data += [features]
-
-    if shuffle: random.Random(seed).shuffle(all_data)
-
-
-    return all_data
+    return all_data_train, all_data_test

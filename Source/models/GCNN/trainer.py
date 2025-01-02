@@ -6,8 +6,6 @@ import copy
 import json
 import os
 
-# from Source.trainer import ModelTrainer
-
 import pytorch_lightning
 import torch_geometric
 from pytorch_lightning import Trainer
@@ -113,40 +111,11 @@ class GCNNTrainer:
                 for phase, true, pred in zip(phase_names, true_values, pred_values):
                     local_true = true[target["name"]]
                     local_pred = pred[target["name"]]
-                    # mask = ~np.isnan(local_true)
 
                     metric, params = target["metrics"][metric_name]
                     key = f"{target['name']}_{phase}_{metric_name}"
                     res = metric(local_true, local_pred, **params)
-                    results_dict[key] = float(res) #if np.prod(res.shape) == 1 else res.tolist()
-
-        return results_dict
-
-    # def count_test_pred(self): #####
-    #     train_true, valid_true, test_true, train_pred, valid_pred, test_pred = self.get_true_pred()
-    #     return test_pred
-
-    def calculate_general_metrics(self):####
-        train_true, valid_true, test_true, train_pred, valid_pred, test_pred = self.get_true_pred()
-        test_pred = self.test_dict
-
-        phase_names = ("train", "valid", "test") if self.test_data else ("train", "valid")
-        true_values = (train_true, valid_true, test_true) if self.test_data else (train_true, valid_true)
-        pred_values = (train_pred, valid_pred, test_pred) if self.test_data else (train_pred, valid_pred)
-
-        results_dict = {}
-
-        for target in self.targets:
-            for metric_name in target["metrics"]:
-                for phase, true, pred in zip(phase_names, true_values, pred_values):
-                    local_true = true[target["name"]]
-                    local_pred = pred[target["name"]]
-                    # mask = ~np.isnan(local_true)
-
-                    metric, params = target["metrics"][metric_name]
-                    key = f"{target['name']}_{phase}_{metric_name}"
-                    res = metric(local_true, local_pred, **params)
-                    results_dict[key] = float(res) #if np.prod(res.shape) == 1 else res.tolist()
+                    results_dict[key] = float(res)
 
         return results_dict
 
@@ -154,9 +123,6 @@ class GCNNTrainer:
         """
         Create model, train it with KFold cross-validation and write down metrics
         """
-        self.test_results = [0 for _ in range(len(self.test_data.dataset))] ######
-        self.test_dict = {}
-
         if self.save_to_folder:
             self.prepare_out_folder()
 
@@ -166,35 +132,20 @@ class GCNNTrainer:
 
             self.train_model(model, train_dataloader, valid_dataloader, fold_ind, self.epochs)
 
-            for t in range(len(self.test_results)): ########
-                self.test_results[t] += float(np.array(self.get_true_pred()[-1]['Solubility'][t]))
-
-        for t in range(len(self.test_results)):  ########
-            self.test_results[t] = self.test_results[t]/5
-            
-        self.test_results = [[self.test_results[b]] for b in range(len(self.test_results))]
-        self.test_dict["Solubility"] = np.array(self.test_results)
-
-
-
-
 
         self.results_dict["general"] = self.calculate_metrics()
 
         if self.logger is not None:
             self.logger.log_metrics(self.results_dict["general"])
 
-
-        #запись в self.results_dict метрик для test + отдельно функция для расчета метрик только для test
-
         if self.save_to_folder:
             with open(os.path.join(self.main_folder, "metrics.json"), "w") as jf:
                 json.dump(self.results_dict["general"], jf)
 
-        self.results_dict["test"] = self.calculate_general_metrics()
-
-        with open(os.path.join(self.main_folder, "metrics_test.json"), "w") as jf:
-            json.dump(self.results_dict["test"], jf)
+        with open(os.path.join(self.main_folder, "test_true"), "w") as txtfile:
+            txtfile.write(str(self.get_true_pred()[2]))
+        with open(os.path.join(self.main_folder, "test_pred"), "w") as txtfile:
+            txtfile.write(str(self.get_true_pred()[-1]))
 
 
     def train_model(self, model, train_dataloader, valid_dataloader, current_fold_num, epochs=1000):

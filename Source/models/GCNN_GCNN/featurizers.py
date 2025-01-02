@@ -9,6 +9,7 @@ from rdkit import Chem
 from torch_geometric.data import Data
 
 from config import ROOT_DIR
+import torch
 
 
 class PairData(Data):
@@ -68,6 +69,52 @@ def featurize_df(df, mol_featurizer, metal_featurizer, seed=42):
                               x_metal=metal_graph.x, edge_index_metal=metal_graph.edge_index,
                               edge_attr_metal=metal_graph.edge_attr, u_metal=metal_graph.u,
                               y=df["logK"][i])]
+    random.Random(seed).shuffle(all_data)
+
+    return all_data
+
+
+class PairDataSolubility(Data):
+    def __inc__(self, key, value, *args, **kwargs):
+        if key == 'edge_index_solvent': #edge_index_mol -> edge_index_solvent
+            return self.x_solvent.size(0) #self.x_mol.size -> self.x_solvent.size
+        if key == 'edge_index_molecule': #edge_index_metal -> edge_index_molecule
+            return self.x_molecule.size(0) #self.x_metal.size -> self.x_molecule.size
+        return super().__inc__(key, value, *args, **kwargs)
+
+
+def featurize_sdf_mol_solv(path_to_sdf, solvent_featurizer, molecule_featurizer, seed=42):
+
+
+    if path_to_sdf is None:
+        raise ValueError("'path_to_sdf' parameter should be stated")
+
+    mols = [mol for mol in Chem.SDMolSupplier(path_to_sdf) if mol is not None]
+
+    
+    all_data = []
+    for mol_ind in range(len(mols)):
+
+        molecule = mols[mol_ind]
+        solvent = Chem.MolFromSmiles(molecule.GetProp('Solvent_smiles'))
+
+        solvent_graph = solvent_featurizer.featurize(solvent)
+        molecule_graph = molecule_featurizer.featurize(molecule)
+
+        if solvent_graph is None:
+            warnings.warn(f"Can't featurize solvent: {mol_ind}")
+            continue
+        if molecule_graph is None:
+            warnings.warn(f"Can't featurize molecule: {mol_ind}")
+            continue
+
+
+        all_data.append(PairDataSolubility(x_solvent=solvent_graph.x, edge_index_solvent=solvent_graph.edge_index,
+                              x_molecule=molecule_graph.x, edge_index_molecule=molecule_graph.edge_index,
+                              y=torch.Tensor([float(molecule.GetProp('Solubility'))]), batch_solvent=torch.tensor([0] * solvent_graph.x.size(0)),
+                batch_molecule=torch.tensor([1] * molecule_graph.x.size(0))))
+
+
     random.Random(seed).shuffle(all_data)
 
     return all_data

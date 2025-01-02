@@ -82,10 +82,11 @@ class BaseModel(LightningModule):
         pred = self.forward(val_batch)
         true = val_batch.y
         loss = torch.cat([
-            target["loss"](pred[target["name"]], true[target["name"]]).unsqueeze(0)
+            target["loss"](pred[target["name"]], true).unsqueeze(0)
             for target in self.targets
         ], dim=0).sum()
-        self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1)
+
+        self.log('val_loss', loss, batch_size=val_batch.batch.max() + 1, prog_bar=True)
         self.val_step_outputs += [pred]
         self.val_step_true += [true]
         return loss
