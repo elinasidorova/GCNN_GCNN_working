@@ -17,17 +17,11 @@ class BasePooling(nn.Module):
 class ConcatPooling(BasePooling):
     def __init__(self, input_dims):
         super(ConcatPooling, self).__init__(input_dims)
-        #self.output_dim = sum(input_dims)
-        self.output_dim = input_dims
+        self.output_dim = sum(input_dims)
 
     def forward(self, *tensors):
         super().forward(*tensors)
-        # for i, tensor in enumerate(tensors):
-        #     if tensor.shape[-1] != self.input_dims[i]:
-        #         raise ValueError(
-        #             f"tensor {i} must have last dimension of {self.input_dims[i]}, but has {tensor.shape[-1]}")
-        #return torch.cat(tensors, dim=-1)
-        return torch.cat(tensors, dim=0)
+        return torch.cat(tensors, dim=-1)
 
 
 class SumPooling(BasePooling):

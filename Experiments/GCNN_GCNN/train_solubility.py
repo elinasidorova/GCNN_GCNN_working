@@ -36,11 +36,11 @@ time_mark = str(datetime.now()).replace(" ", "_").replace("-", "_").replace(":",
 # parser.add_argument('--experiment-name', type=str, help='The name of the experiment')  # required=True,
 #
 # args = parser.parse_args()
-args = Namespace(train_sdf="Data/bigsoldb_24_10_14.sdf", test_sdf="Data/bigsoldb_24_10_14.sdf", experiment_name="test")
+args = Namespace(train_sdf="Data/bigsoldb_test_24_10_14.sdf", test_sdf="Data/bigsoldb_test_24_10_14.sdf", experiment_name="test")
 #теперь: metal -> molecule, mol -> solvent
 
 targets = ({
-               "name": 'Solubility', #logK -> Solubility
+               "name": 'Solubility',
                "mode": "regression",
                "dim": 1,
                "metrics": {
@@ -52,7 +52,7 @@ targets = ({
            },)
 
 model_parameters = {
-    "solvent_gcnn_params": { #mol_gcnn_params -> solvent_gcnn_params
+    "solvent_gcnn_params": {
         "pre_fc_params": {
             "hidden": (),
             "dropout": 0,
@@ -71,7 +71,7 @@ model_parameters = {
         "conv_parameters": None,
         "graph_pooling": global_mean_pool
     },
-    "molecule_gcnn_params": { #metal_gcnn_params -> molecule_gcnn_params
+    "molecule_gcnn_params": {
         "pre_fc_params": {
             "hidden": (),
             "dropout": 0,
@@ -99,10 +99,6 @@ model_parameters = {
     "global_pooling": ConcatPooling,
 }
 
-#это пока не надо
-# test_metal = "U"
-# all_metals = ['Ac']
-
 cv_folds = 1
 seed = 23
 batch_size = 16
@@ -113,22 +109,31 @@ mode = "regression"
 logging.info("Featurizing...")
 
 
-train_datasets = [featurize_sdf_mol_solv(path_to_sdf=str(ROOT_DIR / args.train_sdf),
-                                         solvent_featurizer=ConvMolFeaturizer(),
-                                         molecule_featurizer=ConvMolFeaturizer())] #списки списков PairData по элементам -> список PairData по точкам
+train_datasets = [
+    featurize_sdf_mol_solv(
+        path_to_sdf=str(ROOT_DIR / args.train_sdf),
+        solvent_featurizer=ConvMolFeaturizer(),
+        molecule_featurizer=ConvMolFeaturizer()
+    )
+]
 
-print('train datasets')
-print(train_datasets)
-folds= balanced_train_valid_split(datasets=train_datasets,
-                                   n_folds=1,
-                                   batch_size=batch_size,
-                                   shuffle_every_epoch=True,
-                                   seed=seed)
+folds= balanced_train_valid_split(
+    datasets=train_datasets,
+    n_folds=1,
+    batch_size=batch_size,
+    shuffle_every_epoch=True,
+    seed=seed
+)
 
 
-test_loader = DataLoader(featurize_sdf_mol_solv(path_to_sdf=str(ROOT_DIR / args.test_sdf),
-                                         solvent_featurizer=ConvMolFeaturizer(),
-                                         molecule_featurizer=ConvMolFeaturizer()), batch_size=batch_size)
+test_loader = DataLoader(
+    featurize_sdf_mol_solv(
+        path_to_sdf=str(ROOT_DIR / args.test_sdf),
+        solvent_featurizer=ConvMolFeaturizer(),
+        molecule_featurizer=ConvMolFeaturizer()
+    ),
+    batch_size=batch_size
+)
 
 
 model = GCNN_GCNN(
@@ -139,8 +144,6 @@ model = GCNN_GCNN(
     optimizer=torch.optim.Adam,
     optimizer_parameters=None,
 )
-
-#это точно оставим как есть
 
 trainer = GCNNTrainer(
     model=model,

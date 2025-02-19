@@ -109,10 +109,19 @@ def featurize_sdf_mol_solv(path_to_sdf, solvent_featurizer, molecule_featurizer,
             continue
 
 
-        all_data.append(PairDataSolubility(x_solvent=solvent_graph.x, edge_index_solvent=solvent_graph.edge_index,
-                              x_molecule=molecule_graph.x, edge_index_molecule=molecule_graph.edge_index,
-                              y=torch.Tensor([float(molecule.GetProp('Solubility'))]), batch_solvent=torch.tensor([0] * solvent_graph.x.size(0)),
-                batch_molecule=torch.tensor([1] * molecule_graph.x.size(0))))
+        all_data.append(PairDataSolubility(
+            x=torch.cat([solvent_graph.x, molecule_graph.x], dim=0),
+            edge_index=torch.cat([solvent_graph.edge_index, molecule_graph.edge_index], dim=1),
+            y={"Solubility": torch.tensor([[float(molecule.GetProp('Solubility'))]])},
+            batch=torch.tensor([0] * (solvent_graph.x.size(0) + molecule_graph.x.size(0))),
+
+            x_solvent=solvent_graph.x,
+            edge_index_solvent=solvent_graph.edge_index,
+            x_molecule=molecule_graph.x,
+            edge_index_molecule=molecule_graph.edge_index,
+            batch_solvent=torch.tensor([0] * solvent_graph.x.size(0)),
+            batch_molecule=torch.tensor([0] * molecule_graph.x.size(0)),
+        ))
 
 
     random.Random(seed).shuffle(all_data)

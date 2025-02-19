@@ -88,7 +88,8 @@ class GCNN_GCNN(BaseModel):
 
         # self.global_pooling = global_pooling(input_dims=(self.solvent_gcnn_sequential.output_dim,
         #                                                  self.molecule_gcnn_sequential.output_dim))
-        self.global_pooling = global_pooling(input_dims=self.solvent_gcnn_sequential.output_dim)
+        self.global_pooling = global_pooling(input_dims=(self.solvent_gcnn_sequential.output_dim,
+                                                         self.molecule_gcnn_sequential.output_dim))
 
         post_fc_params["input_features"] = self.global_pooling.output_dim
 
